@@ -56,3 +56,6 @@ export type {
   RelatedSuggestion,
   GraphRankedResult,
 } from './graph-ranking.js';
+
+export { createFaissEngine } from './faiss-engine.js';
+export type { FaissEngineConfig, FaissEngineResult } from './faiss-engine.js';
