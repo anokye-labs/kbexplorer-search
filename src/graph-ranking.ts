@@ -171,16 +171,17 @@ export function applyGraphRanking(
   // Re-sort by adjusted score
   boosted.sort((a, b) => b.score - a.score);
 
-  // Generate related suggestions from graph neighbors not in results
+  // Generate related suggestions from graph neighbors not in results.
+  // Duplicates are allowed here — the merge step below combines them and
+  // accumulates sourceNodeIds so multi-source suggestions rank higher.
   const suggestions: RelatedSuggestion[] = [];
-  const suggestedIds = new Set<string>();
 
   for (const nodeId of topNodeIds) {
     // Neighbors
     const conns = connectionMap.get(nodeId);
     if (conns) {
       for (const connId of conns) {
-        if (resultNodeIds.has(connId) || suggestedIds.has(connId)) continue;
+        if (resultNodeIds.has(connId)) continue;
         const units = nodeToUnits.get(connId);
         if (!units || units.length === 0) continue;
         const unit = units[0];
@@ -191,13 +192,12 @@ export function applyGraphRanking(
           reason: 'neighbor',
           sourceNodeIds: [nodeId],
         });
-        suggestedIds.add(connId);
       }
     }
 
     // Parent
     const parent = parentMap.get(nodeId);
-    if (parent && !resultNodeIds.has(parent) && !suggestedIds.has(parent)) {
+    if (parent && !resultNodeIds.has(parent)) {
       const units = nodeToUnits.get(parent);
       if (units && units.length > 0) {
         suggestions.push({
@@ -207,7 +207,6 @@ export function applyGraphRanking(
           reason: 'parent',
           sourceNodeIds: [nodeId],
         });
-        suggestedIds.add(parent);
       }
     }
 
@@ -215,7 +214,7 @@ export function applyGraphRanking(
     const children = childrenMap.get(nodeId);
     if (children) {
       for (const childId of children) {
-        if (resultNodeIds.has(childId) || suggestedIds.has(childId)) continue;
+        if (resultNodeIds.has(childId)) continue;
         const units = nodeToUnits.get(childId);
         if (!units || units.length === 0) continue;
         suggestions.push({
@@ -225,7 +224,6 @@ export function applyGraphRanking(
           reason: 'child',
           sourceNodeIds: [nodeId],
         });
-        suggestedIds.add(childId);
       }
     }
   }

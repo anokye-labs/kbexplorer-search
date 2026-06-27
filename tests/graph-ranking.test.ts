@@ -244,4 +244,28 @@ describe('applyGraphRanking', () => {
     // B should appear as suggestion (neighbor of A)
     expect(ranked.suggestions.some((s) => s.nodeId === 'B')).toBe(true);
   });
+
+  it('accumulates multiple source nodes for shared suggestions', () => {
+    // D is a neighbor of both A and B (top results)
+    const units: SearchUnit[] = [
+      unit('A', { connections: ['D'] }),
+      unit('B', { connections: ['D'] }),
+      unit('C'),
+      unit('D', { title: 'Shared Neighbor' }),
+    ];
+
+    const results: SearchResult[] = [
+      result('A', 0.9),
+      result('B', 0.85),
+      result('C', 0.7),
+    ];
+
+    const ranked = applyGraphRanking(results, units);
+    const dSuggestion = ranked.suggestions.find((s) => s.nodeId === 'D');
+    expect(dSuggestion).toBeDefined();
+    // D should have both A and B as sources
+    expect(dSuggestion!.sourceNodeIds).toContain('A');
+    expect(dSuggestion!.sourceNodeIds).toContain('B');
+    expect(dSuggestion!.sourceNodeIds.length).toBe(2);
+  });
 });
