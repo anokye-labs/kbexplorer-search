@@ -1,0 +1,48 @@
+{
+  "name": "@anokye-labs/kbexplorer-search",
+  "version": "0.1.0",
+  "description": "Semantic search companion module for kbexplorer — index production and consumption over knowledge graphs",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "lint": "eslint src/ tests/",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "kbexplorer",
+    "semantic-search",
+    "knowledge-graph",
+    "embeddings",
+    "vector-search"
+  ],
+  "author": "Anokye Labs",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anokye-labs/kbexplorer-search.git"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "eslint": "^9.27.0",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.62.0",
+    "vitest": "^3.2.1"
+  }
+}

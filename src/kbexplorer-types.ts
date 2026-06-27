@@ -1,0 +1,99 @@
+/**
+ * Inlined subset of kbexplorer types consumed by the search module.
+ *
+ * These mirror the canonical definitions in kbexplorer-template/src/types/index.ts.
+ * TODO: Replace with `@anokye-labs/kbexplorer-core` dependency when published.
+ */
+
+export type EdgeType =
+  | 'contains'
+  | 'derived_from'
+  | 'imports'
+  | 'references'
+  | 'frontmatter'
+  | 'mentions'
+  | 'cross_references'
+  | 'modifies'
+  | 'closes'
+  | 'related'
+  | (string & {});
+
+export type EdgeSource = 'inline' | 'frontmatter' | 'inferred';
+
+export interface Connection {
+  to: string;
+  type?: EdgeType;
+  description: string;
+  source?: EdgeSource;
+  weight?: number;
+  relation?: string;
+}
+
+export type NodeSource =
+  | { type: 'authored'; file: string }
+  | { type: 'issue'; number: number; state: string; labels: string[] }
+  | { type: 'pull_request'; number: number; state: string }
+  | { type: 'commit'; sha: string }
+  | { type: 'file'; path: string }
+  | { type: 'readme' }
+  | { type: 'section'; parentSource: NodeSource }
+  | { type: 'derived'; generator: string }
+  | { type: 'external'; provider: string }
+  | { type: 'branch'; name: string; protected: boolean }
+  | { type: 'workflow'; path: string }
+  | { type: 'repository'; owner: string; repo: string }
+  | { type: 'structured'; entityType: string; ref?: string }
+  | { type: 'release'; tag: string; prerelease: boolean }
+  | { type: 'person'; login: string; linked: boolean };
+
+export interface JsonLd {
+  '@context'?: string | Record<string, unknown> | Array<string | Record<string, unknown>>;
+  '@id': string;
+  '@type': string | string[];
+  [key: string]: unknown;
+}
+
+export interface KBNode {
+  id: string;
+  title: string;
+  cluster: string;
+  content: string;
+  rawContent: string;
+  emoji?: string;
+  image?: string;
+  sprite?: string;
+  parent?: string;
+  nodeType?: 'parent' | 'section';
+  display?: string;
+  connections: Connection[];
+  identity?: string;
+  derived?: boolean;
+  source: NodeSource;
+  provider?: string;
+  entityType?: string;
+  jsonld?: JsonLd;
+  data?: Record<string, unknown>;
+}
+
+export interface KBEdge {
+  from: string;
+  to: string;
+  type: EdgeType;
+  description: string;
+  source: EdgeSource;
+  weight: number;
+  relation?: string;
+}
+
+export interface Cluster {
+  id: string;
+  name: string;
+  color: string;
+}
+
+export interface KBGraph {
+  nodes: KBNode[];
+  edges: KBEdge[];
+  clusters: Cluster[];
+  related: Record<string, string[]>;
+}
