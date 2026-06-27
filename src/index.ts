@@ -46,3 +46,6 @@ export {
   listProviders,
 } from './providers/index.js';
 export { OpenAIProvider } from './providers/index.js';
+
+export { createSearchServer } from './server.js';
+export type { ServerConfig, SearchServer } from './server.js';
