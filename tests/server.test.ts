@@ -101,6 +101,25 @@ describe('search server', () => {
     expect(body.results[0]).toHaveProperty('nodeId');
     expect(body.results[0]).toHaveProperty('score');
     expect(body.results[0]).toHaveProperty('snippet');
+    // Stable contract: suggestions is always present (empty without graphRanking).
+    expect(body.suggestions).toEqual([]);
+  });
+
+  it('POST /search with graphRanking returns graph suggestions', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: 'audit validation', limit: 1, graphRanking: true }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.results).toHaveLength(1);
+    expect(body.results[0].nodeId).toBe('node-a');
+    // node-b is a 1-hop neighbor of node-a and not in the result set,
+    // so graph ranking surfaces it as a related suggestion.
+    expect(Array.isArray(body.suggestions)).toBe(true);
+    expect(body.suggestions.map((s: { nodeId: string }) => s.nodeId)).toContain('node-b');
+    expect(body.suggestions[0]).toHaveProperty('reason');
   });
 
   it('POST /search with cluster filter', async () => {

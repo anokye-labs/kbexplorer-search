@@ -11,11 +11,16 @@
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "kbexplorer-search": "./bin/kbexplorer-search.js"
+  },
   "files": [
-    "dist"
+    "dist",
+    "bin"
   ],
   "scripts": {
     "build": "tsc -b",
+    "serve": "node bin/kbexplorer-search.js serve",
     "lint": "eslint src/ tests/",
     "test": "vitest run",
     "test:watch": "vitest",
