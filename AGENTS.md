@@ -33,6 +33,7 @@ src/
   types.ts              Core type definitions (SearchUnit, SearchResult, etc.)
   kbexplorer-types.ts   Inlined kbexplorer types (TODO: switch to @anokye-labs/kbexplorer-core)
   extract.ts            KBGraph -> SearchUnit[] extraction pipeline
+  access.ts             Access-label exclusion policy for the index-build path
   embed.ts              Batch embedding generation with caching
   artifacts.ts          Deterministic artifact read/write
   drift.ts              CI drift detection gate

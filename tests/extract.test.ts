@@ -194,3 +194,101 @@ describe('extractSearchUnits', () => {
     expect(unit.path).toBe('content/test.md');
   });
 });
+
+describe('extractSearchUnits — access labels (issue #9)', () => {
+  it('excludes restricted and unknown nodes from the index by default', () => {
+    const graph = makeGraph([
+      makeNode({ id: 'pub', title: 'Public', rawContent: 'public body' }),
+      makeNode({
+        id: 'sec',
+        title: 'Secret',
+        rawContent: 'secret body',
+        access: { classification: 'restricted' },
+      }),
+      makeNode({
+        id: 'unk',
+        title: 'Unknown',
+        rawContent: 'unknown body',
+        access: { classification: 'unknown' },
+      }),
+    ]);
+
+    const units = extractSearchUnits(graph);
+    expect(units.map((u) => u.nodeId)).toEqual(['pub']);
+  });
+
+  it('excludes private-visibility nodes by default', () => {
+    const graph = makeGraph([
+      makeNode({ id: 'a', title: 'A', rawContent: 'a body' }),
+      makeNode({
+        id: 'b',
+        title: 'B',
+        rawContent: 'b body',
+        access: { classification: 'public', visibility: 'private' },
+      }),
+    ]);
+
+    const units = extractSearchUnits(graph);
+    expect(units.map((u) => u.nodeId)).toEqual(['a']);
+  });
+
+  it('does not leak excluded titles or text into any unit', () => {
+    const graph = makeGraph([
+      makeNode({
+        id: 'sec',
+        title: 'Top Secret Title',
+        rawContent: 'classified body text',
+        access: { classification: 'restricted' },
+      }),
+    ]);
+
+    const serialized = JSON.stringify(extractSearchUnits(graph));
+    expect(serialized).not.toContain('Top Secret Title');
+    expect(serialized).not.toContain('classified body text');
+  });
+
+  it('indexes public/internal and unlabeled content; excludes confidential', () => {
+    const graph = makeGraph([
+      makeNode({ id: 'none', title: 'None', rawContent: 'x' }),
+      makeNode({ id: 'pub', title: 'Pub', rawContent: 'x', access: { classification: 'public' } }),
+      makeNode({ id: 'int', title: 'Int', rawContent: 'x', access: { classification: 'internal' } }),
+      makeNode({ id: 'con', title: 'Con', rawContent: 'x', access: { classification: 'confidential' } }),
+    ]);
+
+    const units = extractSearchUnits(graph);
+    expect(units.map((u) => u.nodeId)).toEqual(['int', 'none', 'pub']);
+    for (const u of units) expect(u.access).toBeUndefined();
+  });
+
+  it('include mode indexes restricted units with their access label attached', () => {
+    const graph = makeGraph([
+      makeNode({ id: 'pub', title: 'Pub', rawContent: 'x' }),
+      makeNode({
+        id: 'sec',
+        title: 'Sec',
+        rawContent: 'x',
+        access: { classification: 'restricted', labels: ['pii'] },
+      }),
+    ]);
+
+    const units = extractSearchUnits(graph, undefined, { mode: 'include' });
+    expect(units.map((u) => u.nodeId)).toEqual(['pub', 'sec']);
+    const sec = units.find((u) => u.nodeId === 'sec');
+    expect(sec?.access).toEqual({ classification: 'restricted', labels: ['pii'] });
+    const pub = units.find((u) => u.nodeId === 'pub');
+    expect(pub?.access).toBeUndefined();
+  });
+
+  it('exclusion is deterministic: byte-identical output across runs', () => {
+    const build = () =>
+      makeGraph([
+        makeNode({ id: 'a', title: 'A', rawContent: 'a' }),
+        makeNode({ id: 'b', title: 'B', rawContent: 'b', access: { classification: 'restricted' } }),
+        makeNode({ id: 'c', title: 'C', rawContent: 'c', access: { visibility: 'private' } }),
+      ]);
+
+    const first = JSON.stringify(extractSearchUnits(build()));
+    const second = JSON.stringify(extractSearchUnits(build()));
+    expect(first).toBe(second);
+  });
+});

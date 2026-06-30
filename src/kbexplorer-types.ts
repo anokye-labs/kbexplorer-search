@@ -46,6 +46,49 @@ export type NodeSource =
   | { type: 'release'; tag: string; prerelease: boolean }
   | { type: 'person'; login: string; linked: boolean };
 
+/**
+ * Access classification axis (most → least sensitive within the named tiers).
+ * `unknown` is treated as maximally sensitive by the access lattice because an
+ * unclassified resource may be anything.
+ */
+export type KBAccessClassification =
+  | 'public'
+  | 'internal'
+  | 'confidential'
+  | 'restricted'
+  | 'unknown';
+
+/** Access visibility axis. */
+export type KBAccessVisibility = 'public' | 'internal' | 'private';
+
+/**
+ * An opaque pointer back to the source-of-record policy that produced a label.
+ * Mirrors kbexplorer-core's `ExternalRef`; kept structurally loose here.
+ */
+export interface ExternalRef {
+  provider?: string;
+  id?: string;
+  url?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Label-only access descriptor carried on nodes/edges.
+ *
+ * Mirrors the canonical kbexplorer-core `KBAccessLabel` (core v0.3.0). The shape
+ * is kept byte-identical to core (classification/visibility/labels[]/
+ * sourcePolicyRef) so the inlined mirror does not drift; replace with the core
+ * import when `@anokye-labs/kbexplorer-core` is taken as a dependency.
+ * kbx **labels**; the host **enforces**. There is deliberately no `canRead`,
+ * principals, OAuth, or redactor here.
+ */
+export interface KBAccessLabel {
+  classification?: KBAccessClassification;
+  visibility?: KBAccessVisibility;
+  labels?: string[];
+  sourcePolicyRef?: ExternalRef;
+}
+
 export interface JsonLd {
   '@context'?: string | Record<string, unknown> | Array<string | Record<string, unknown>>;
   '@id': string;
@@ -73,6 +116,8 @@ export interface KBNode {
   entityType?: string;
   jsonld?: JsonLd;
   data?: Record<string, unknown>;
+  /** Canonical access label from kbexplorer-core (core v0.3.0 `KBNode.access`). */
+  access?: KBAccessLabel;
 }
 
 export interface KBEdge {
@@ -83,6 +128,8 @@ export interface KBEdge {
   source: EdgeSource;
   weight: number;
   relation?: string;
+  /** Canonical access label from kbexplorer-core (core v0.3.0 `KBEdge.access`). */
+  access?: KBAccessLabel;
 }
 
 export interface Cluster {

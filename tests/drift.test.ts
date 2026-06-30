@@ -105,4 +105,45 @@ describe('checkDrift', () => {
     expect(result.fresh).toBe(false);
     expect(result.contentHashMatch).toBe(false);
   });
+
+  it('stays fresh when access-excluded nodes are absent from the index', () => {
+    // Build artifacts with default exclusion: the restricted node is omitted.
+    const graph: KBGraph = {
+      ...makeGraph({ a: 'Content A' }),
+      nodes: [
+        ...makeGraph({ a: 'Content A' }).nodes,
+        {
+          id: 'sec',
+          title: 'sec',
+          cluster: 'default',
+          content: '',
+          rawContent: 'restricted content',
+          connections: [],
+          source: { type: 'authored' as const, file: 'content/sec.md' },
+          access: { classification: 'restricted' },
+        },
+      ],
+    };
+
+    const units = extractSearchUnits(graph);
+    const hash = computeContentHash(graph);
+    const vectors = units.map((u) => ({
+      unitId: u.unitId,
+      vector: [0.1, 0.2, 0.3],
+      model: 'test',
+      dimensions: 3,
+    }));
+    writeArtifacts(
+      dir,
+      units,
+      vectors,
+      { embedding: { provider: 'test', model: 'test', dimensions: 3 }, artifacts: { dir } },
+      hash,
+    );
+
+    const result = checkDrift(dir, graph);
+    expect(result.fresh).toBe(true);
+    expect(result.missingUnits).toEqual([]);
+    expect(units.map((u) => u.unitId)).not.toContain('sec');
+  });
 });

@@ -30,6 +30,13 @@ export interface SearchUnit {
   identity?: string;
   /** IDs of directly connected nodes. */
   connections: string[];
+  /**
+   * Access label carried from the source node. Only populated in the opt-in
+   * host-predicate filtered (`include`) index mode so a host can filter at
+   * query time; omitted in the default `exclude` mode (restricted units are
+   * dropped entirely). Search itself never evaluates principals.
+   */
+  access?: import('./kbexplorer-types.js').KBAccessLabel;
   /** Extensible metadata bag. */
   metadata: Record<string, unknown>;
 }

@@ -11,6 +11,11 @@
 import type { KBGraph, KBNode, KBEdge } from './kbexplorer-types.js';
 import type { SearchUnit, ResolvedChunkingConfig } from './types.js';
 import { DEFAULT_CHUNKING } from './types.js';
+import {
+  resolveAccessConfig,
+  isExcludedByAccess,
+  type AccessExclusionConfig,
+} from './access.js';
 
 /**
  * Strip HTML tags from content, producing plain text.
@@ -211,15 +216,23 @@ function chunkAtHeadings(
  * prepended with a context header capturing graph structure.
  *
  * Output is deterministic: sorted by unitId.
+ *
+ * Access labels are respected on the index-build path (issue #9): nodes whose
+ * `access` label is excluded under `accessConfig` are dropped entirely in the
+ * default `exclude` mode, or indexed with their `access` label attached in the
+ * opt-in host-predicate filtered (`include`) mode. Exclusion is a pure function
+ * of (label, config), so artifacts stay deterministic and the drift gate green.
  */
 export function extractSearchUnits(
   graph: KBGraph,
   config?: Partial<ResolvedChunkingConfig>,
+  accessConfig?: Partial<AccessExclusionConfig>,
 ): SearchUnit[] {
   const chunkConfig: ResolvedChunkingConfig = {
     ...DEFAULT_CHUNKING,
     ...config,
   };
+  const access = resolveAccessConfig(accessConfig);
 
   const nodeMap = new Map(graph.nodes.map((n) => [n.id, n]));
   const connectionMap = buildConnectionMap(graph.edges);
@@ -229,6 +242,13 @@ export function extractSearchUnits(
   const sortedNodes = [...graph.nodes].sort((a, b) => a.id.localeCompare(b.id));
 
   for (const node of sortedNodes) {
+    // Respect access labels (issue #9). In the default `exclude` mode an
+    // access-restricted node yields no unit/vector at all. In the opt-in
+    // `include` mode it is indexed with its label attached for host filtering.
+    const excluded = isExcludedByAccess(node.access, access);
+    if (excluded && access.mode === 'exclude') continue;
+    const unitAccess = excluded ? node.access : undefined;
+
     // Use rawContent (markdown) as primary; fall back to stripped HTML
     const bodyText = node.rawContent?.trim()
       ? node.rawContent.trim()
@@ -266,6 +286,7 @@ export function extractSearchUnits(
         entityType: node.entityType,
         identity: node.identity,
         connections,
+        access: unitAccess,
         metadata: {
           hierarchyPath,
           neighborTitles,
@@ -289,6 +310,7 @@ export function extractSearchUnits(
           entityType: node.entityType,
           identity: node.identity,
           connections,
+          access: unitAccess,
           metadata: {
             hierarchyPath,
             neighborTitles,
