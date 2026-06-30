@@ -6,8 +6,13 @@
  *
  * Endpoints:
  *   GET  /health          → { status: 'ok', unitCount, model }
- *   POST /search          → { results: SearchResult[] }
+ *   POST /search          → { results: SearchResult[], suggestions: RelatedSuggestion[] }
  *   GET  /stats           → { unitCount, model, dimensions, contentHash }
+ *
+ * POST /search accepts { query, limit?, cluster?, entityType?, minScore?,
+ * graphRanking? }. When `graphRanking` is true the results are re-ranked with
+ * graph structure and `suggestions` (related graph neighbors not in the result
+ * set) are returned; otherwise `suggestions` is an empty array.
  *
  * Uses Node built-in http — no framework dependency.
  */
@@ -16,6 +21,7 @@ import { createServer, type Server, type IncomingMessage, type ServerResponse } 
 import type { EmbeddingProvider } from './providers/interface.js';
 import type { EmbeddingArtifact, SearchOptions, SearchResult } from './types.js';
 import { createSearchEngine } from './search-engine.js';
+import { applyGraphRanking, type RelatedSuggestion } from './graph-ranking.js';
 
 export interface ServerConfig {
   port?: number;
@@ -37,6 +43,12 @@ interface SearchRequestBody {
   cluster?: string;
   entityType?: string;
   minScore?: number;
+  /**
+   * When true, apply graph-aware ranking and return related-node
+   * `suggestions` derived from graph structure. Defaults to false so the
+   * raw cosine ranking is returned unchanged.
+   */
+  graphRanking?: boolean;
 }
 
 function readBody(req: IncomingMessage): Promise<string> {
@@ -123,8 +135,21 @@ export function createSearchServer(
           minScore: body.minScore,
         };
 
-        const results: SearchResult[] = await engine.search(body.query, options);
-        jsonResponse(res, 200, { results });
+        const rawResults: SearchResult[] = await engine.search(body.query, options);
+
+        // Graph-aware ranking is opt-in via `graphRanking`. When enabled, the
+        // raw cosine results are re-ranked using graph structure and a list of
+        // related-node `suggestions` is produced. `suggestions` is always
+        // present in the response for a stable client contract.
+        let results: SearchResult[] = rawResults;
+        let suggestions: RelatedSuggestion[] = [];
+        if (body.graphRanking) {
+          const ranked = applyGraphRanking(rawResults, artifact.units);
+          results = ranked.results;
+          suggestions = ranked.suggestions;
+        }
+
+        jsonResponse(res, 200, { results, suggestions });
         return;
       }
 

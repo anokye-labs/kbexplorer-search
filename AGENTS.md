@@ -38,6 +38,7 @@ src/
   drift.ts              CI drift detection gate
   search-engine.ts      Pure-JS cosine similarity search
   server.ts             Localhost HTTP search service
+  cli.ts                `serve` command — start the HTTP service from artifacts
   providers/
     interface.ts        EmbeddingProvider contract
     openai.ts           OpenAI embedding provider
