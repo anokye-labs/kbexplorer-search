@@ -76,10 +76,10 @@ The index-build path respects access labels carried on nodes/edges
 (`KBAccessLabel { classification, visibility, labels[] }`). kbx **labels**; the
 host **enforces** — search performs **no** principal evaluation.
 
-- **Default-SAFE (`exclude`):** nodes whose `classification` is `restricted` or
-  `unknown`, or whose `visibility` is `private`, produce **no** `SearchUnit` and
-  **no** vector. They never reach `units.json`/`vectors.json`, so even titles
-  cannot leak via search.
+- **Default-SAFE (`exclude`):** nodes whose `classification` is `confidential`,
+  `restricted`, or `unknown`, or whose `visibility` is `private`, produce **no**
+  `SearchUnit` and **no** vector. They never reach `units.json`/`vectors.json`,
+  so even titles cannot leak via search. `public`/`internal` stay indexed.
 - **Opt-in host-predicate filtered (`include`):** restricted units are indexed
   with their `access` label attached so a host can filter at query time; search
   still evaluates no principals.

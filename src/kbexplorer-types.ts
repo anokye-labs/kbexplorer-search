@@ -75,8 +75,12 @@ export interface ExternalRef {
 /**
  * Label-only access descriptor carried on nodes/edges.
  *
- * Mirrors kbexplorer-core `KBAccessLabel`. kbx **labels**; the host **enforces**.
- * There is deliberately no `canRead`, principals, OAuth, or redactor here.
+ * Mirrors the canonical kbexplorer-core `KBAccessLabel` (core v0.3.0). The shape
+ * is kept byte-identical to core (classification/visibility/labels[]/
+ * sourcePolicyRef) so the inlined mirror does not drift; replace with the core
+ * import when `@anokye-labs/kbexplorer-core` is taken as a dependency.
+ * kbx **labels**; the host **enforces**. There is deliberately no `canRead`,
+ * principals, OAuth, or redactor here.
  */
 export interface KBAccessLabel {
   classification?: KBAccessClassification;
@@ -112,7 +116,7 @@ export interface KBNode {
   entityType?: string;
   jsonld?: JsonLd;
   data?: Record<string, unknown>;
-  /** Label-only access descriptor. kbx labels; the host enforces. */
+  /** Canonical access label from kbexplorer-core (core v0.3.0 `KBNode.access`). */
   access?: KBAccessLabel;
 }
 
@@ -124,7 +128,7 @@ export interface KBEdge {
   source: EdgeSource;
   weight: number;
   relation?: string;
-  /** Label-only access descriptor. kbx labels; the host enforces. */
+  /** Canonical access label from kbexplorer-core (core v0.3.0 `KBEdge.access`). */
   access?: KBAccessLabel;
 }
 

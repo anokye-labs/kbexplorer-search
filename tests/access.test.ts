@@ -37,7 +37,7 @@ describe('resolveAccessConfig', () => {
     const partial = { mode: 'include' as const };
     const resolved = resolveAccessConfig(partial);
     expect(resolved.mode).toBe('include');
-    expect(resolved.excludedClassifications).toEqual(['restricted', 'unknown']);
+    expect(resolved.excludedClassifications).toEqual(['confidential', 'restricted', 'unknown']);
     expect(resolved.excludedVisibilities).toEqual(['private']);
     expect(partial).toEqual({ mode: 'include' });
   });
@@ -51,10 +51,10 @@ describe('isExcludedByAccess', () => {
     expect(isExcludedByAccess({}, config)).toBe(false);
     expect(isExcludedByAccess({ classification: 'public' }, config)).toBe(false);
     expect(isExcludedByAccess({ classification: 'internal' }, config)).toBe(false);
-    expect(isExcludedByAccess({ classification: 'confidential' }, config)).toBe(false);
   });
 
-  it('excludes restricted and unknown classifications by default', () => {
+  it('excludes confidential, restricted and unknown classifications by default', () => {
+    expect(isExcludedByAccess({ classification: 'confidential' }, config)).toBe(true);
     expect(isExcludedByAccess({ classification: 'restricted' }, config)).toBe(true);
     expect(isExcludedByAccess({ classification: 'unknown' }, config)).toBe(true);
   });

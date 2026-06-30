@@ -247,7 +247,7 @@ describe('extractSearchUnits — access labels (issue #9)', () => {
     expect(serialized).not.toContain('classified body text');
   });
 
-  it('indexes public/internal/confidential and unlabeled content', () => {
+  it('indexes public/internal and unlabeled content; excludes confidential', () => {
     const graph = makeGraph([
       makeNode({ id: 'none', title: 'None', rawContent: 'x' }),
       makeNode({ id: 'pub', title: 'Pub', rawContent: 'x', access: { classification: 'public' } }),
@@ -256,7 +256,7 @@ describe('extractSearchUnits — access labels (issue #9)', () => {
     ]);
 
     const units = extractSearchUnits(graph);
-    expect(units.map((u) => u.nodeId)).toEqual(['con', 'int', 'none', 'pub']);
+    expect(units.map((u) => u.nodeId)).toEqual(['int', 'none', 'pub']);
     for (const u of units) expect(u.access).toBeUndefined();
   });
 

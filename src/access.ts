@@ -11,9 +11,9 @@
  *  - Exclusion is a **pure function** of (label, config). No timestamps, no
  *    randomness, no I/O. Same graph + same config => byte-identical artifacts,
  *    so the deterministic drift gate stays green.
- *  - Default-SAFE: restricted/unknown classification and `private` visibility
- *    are excluded from the committed index unless explicitly opted into the
- *    host-predicate filtered (`include`) mode.
+ *  - Default-SAFE: confidential/restricted/unknown classification and `private`
+ *    visibility are excluded from the committed index unless explicitly opted
+ *    into the host-predicate filtered (`include`) mode.
  */
 
 import type {
@@ -63,12 +63,16 @@ export interface AccessExclusionConfig {
 }
 
 /**
- * Default-SAFE exclusion policy: withhold restricted/unknown classification and
- * `private` visibility from the committed index.
+ * Default-SAFE exclusion policy: withhold confidential/restricted/unknown
+ * classification and `private` visibility from the committed index. These are
+ * restriction levels whose content should not sit in a checked-in,
+ * potentially-broadly-readable search index. `public`/`internal` stay indexed.
+ * Fully overridable via {@link AccessExclusionConfig} (e.g. a deployment may
+ * re-include `confidential`).
  */
 export const DEFAULT_ACCESS_EXCLUSION: AccessExclusionConfig = {
   mode: 'exclude',
-  excludedClassifications: ['restricted', 'unknown'],
+  excludedClassifications: ['confidential', 'restricted', 'unknown'],
   excludedVisibilities: ['private'],
 };
 
