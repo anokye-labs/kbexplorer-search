@@ -46,6 +46,45 @@ export type NodeSource =
   | { type: 'release'; tag: string; prerelease: boolean }
   | { type: 'person'; login: string; linked: boolean };
 
+/**
+ * Access classification axis (most → least sensitive within the named tiers).
+ * `unknown` is treated as maximally sensitive by the access lattice because an
+ * unclassified resource may be anything.
+ */
+export type KBAccessClassification =
+  | 'public'
+  | 'internal'
+  | 'confidential'
+  | 'restricted'
+  | 'unknown';
+
+/** Access visibility axis. */
+export type KBAccessVisibility = 'public' | 'internal' | 'private';
+
+/**
+ * An opaque pointer back to the source-of-record policy that produced a label.
+ * Mirrors kbexplorer-core's `ExternalRef`; kept structurally loose here.
+ */
+export interface ExternalRef {
+  provider?: string;
+  id?: string;
+  url?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Label-only access descriptor carried on nodes/edges.
+ *
+ * Mirrors kbexplorer-core `KBAccessLabel`. kbx **labels**; the host **enforces**.
+ * There is deliberately no `canRead`, principals, OAuth, or redactor here.
+ */
+export interface KBAccessLabel {
+  classification?: KBAccessClassification;
+  visibility?: KBAccessVisibility;
+  labels?: string[];
+  sourcePolicyRef?: ExternalRef;
+}
+
 export interface JsonLd {
   '@context'?: string | Record<string, unknown> | Array<string | Record<string, unknown>>;
   '@id': string;
@@ -73,6 +112,8 @@ export interface KBNode {
   entityType?: string;
   jsonld?: JsonLd;
   data?: Record<string, unknown>;
+  /** Label-only access descriptor. kbx labels; the host enforces. */
+  access?: KBAccessLabel;
 }
 
 export interface KBEdge {
@@ -83,6 +124,8 @@ export interface KBEdge {
   source: EdgeSource;
   weight: number;
   relation?: string;
+  /** Label-only access descriptor. kbx labels; the host enforces. */
+  access?: KBAccessLabel;
 }
 
 export interface Cluster {

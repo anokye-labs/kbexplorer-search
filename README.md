@@ -70,6 +70,25 @@ You normally don't install this directly — the `kbx` CLI depends on it for ind
 
 Search artifacts are deterministic, reviewable build outputs tied to the exact version of the kbexplorer graph. The repository owns the semantic search corpus; the service only provides query execution.
 
+## Access labels
+
+The index-build path respects access labels carried on nodes/edges
+(`KBAccessLabel { classification, visibility, labels[] }`). kbx **labels**; the
+host **enforces** — search performs **no** principal evaluation.
+
+- **Default-SAFE (`exclude`):** nodes whose `classification` is `restricted` or
+  `unknown`, or whose `visibility` is `private`, produce **no** `SearchUnit` and
+  **no** vector. They never reach `units.json`/`vectors.json`, so even titles
+  cannot leak via search.
+- **Opt-in host-predicate filtered (`include`):** restricted units are indexed
+  with their `access` label attached so a host can filter at query time; search
+  still evaluates no principals.
+
+Exclusion is a pure function of `(label, config)` — no timestamps, no
+randomness — so artifacts stay byte-identical and the `--check` drift gate stays
+green. Override the policy via `AccessExclusionConfig` (`mode`,
+`excludedClassifications`, `excludedVisibilities`).
+
 ## License
 
 MIT

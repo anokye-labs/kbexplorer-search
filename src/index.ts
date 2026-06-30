@@ -20,9 +20,26 @@ export type {
   Connection,
   NodeSource,
   JsonLd,
+  KBAccessLabel,
+  KBAccessClassification,
+  KBAccessVisibility,
+  ExternalRef,
 } from './kbexplorer-types.js';
 
 export { extractSearchUnits } from './extract.js';
+
+export {
+  DEFAULT_ACCESS_EXCLUSION,
+  CLASSIFICATION_SEVERITY,
+  ABSENT_CLASSIFICATION_SEVERITY,
+  resolveAccessConfig,
+  classificationSeverity,
+  isExcludedByAccess,
+} from './access.js';
+export type {
+  AccessExclusionConfig,
+  AccessExclusionMode,
+} from './access.js';
 
 export { generateEmbeddings, hashText } from './embed.js';
 export type { EmbedProgressCallback, GenerateEmbeddingsOptions } from './embed.js';

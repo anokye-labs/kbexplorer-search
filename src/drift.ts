@@ -8,6 +8,7 @@
 
 import type { KBGraph } from './kbexplorer-types.js';
 import type { ResolvedChunkingConfig } from './types.js';
+import type { AccessExclusionConfig } from './access.js';
 import { extractSearchUnits } from './extract.js';
 import { readArtifacts, computeContentHash, canonicalStringify } from './artifacts.js';
 
@@ -28,12 +29,15 @@ export interface DriftResult {
  * Check whether committed artifacts are fresh relative to the current graph.
  *
  * Re-extracts SearchUnits from the graph (no embedding call) and compares
- * against the committed units.json + index-meta.json.
+ * against the committed units.json + index-meta.json. The same `accessConfig`
+ * used to build the index must be supplied so access-excluded units are absent
+ * from both sides and the gate stays deterministic.
  */
 export function checkDrift(
   artifactDir: string,
   graph: KBGraph,
   chunkingConfig?: Partial<ResolvedChunkingConfig>,
+  accessConfig?: Partial<AccessExclusionConfig>,
 ): DriftResult {
   const artifact = readArtifacts(artifactDir);
   if (!artifact) {
@@ -51,7 +55,7 @@ export function checkDrift(
   const contentHashMatch = artifact.meta.contentHash === currentHash;
 
   // Re-extract units from the current graph
-  const currentUnits = extractSearchUnits(graph, chunkingConfig);
+  const currentUnits = extractSearchUnits(graph, chunkingConfig, accessConfig);
   const committedUnits = artifact.units;
 
   // Build maps for comparison
