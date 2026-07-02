@@ -26,9 +26,13 @@ jobs:
           registry-url: https://registry.npmjs.org
       - run: npm ci
       # OIDC trusted publishing (npmjs.com) is the auth path for this workflow.
-      # No NODE_AUTH_TOKEN env var is set: an always-present-but-empty token
-      # risks the npm CLI treating auth as attempted-and-failed instead of
-      # falling through to OIDC. If trusted publishing isn't registered yet,
-      # this step fails with ENEEDAUTH until it is (see npm docs for setup).
+      # setup-node's registry-url always writes an .npmrc referencing
+      # ${NODE_AUTH_TOKEN}. Per npm docs, an undefined env var is left
+      # unreplaced (a literal, bogus token) while a defined-but-empty var
+      # substitutes cleanly to "" — so NODE_AUTH_TOKEN must stay defined as
+      # an explicit empty string to let OIDC take over. If trusted publishing
+      # isn't registered yet, this step fails with ENEEDAUTH until it is.
       # `prepare`/`prepublishOnly` build dist/ before publish.
       - run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ''
