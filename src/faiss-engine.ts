@@ -22,6 +22,15 @@ import type {
 import { createSearchEngine } from './search-engine.js';
 import { makeSnippet } from './snippet.js';
 
+/** The subset of the `faiss-node` module surface this engine depends on. */
+export interface FaissModule {
+  IndexFlatIP: new (dimensions: number) => {
+    add: (vector: number[]) => void;
+    search: (query: number[], k: number) => { distances: number[]; labels: number[] };
+    ntotal: () => number;
+  };
+}
+
 /** Configuration for the FAISS engine. */
 export interface FaissEngineConfig {
   /**
@@ -29,6 +38,19 @@ export interface FaissEngineConfig {
    * is unavailable (default: true).
    */
   fallback?: boolean;
+  /**
+   * Internal test seam — overrides how the `faiss-node` module is loaded.
+   * Defaults to the real dynamic `import('faiss-node')`. Not part of the
+   * supported public API surface; it exists so tests can deterministically
+   * simulate faiss-node being present or absent regardless of whether it
+   * actually built on the machine running the tests.
+   */
+  loadFaiss?: () => Promise<FaissModule>;
+}
+
+/** Default loader: the real dynamic import of the optional native module. */
+async function defaultLoadFaiss(): Promise<FaissModule> {
+  return import('faiss-node');
 }
 
 /** Result of attempting to create a FAISS engine. */
@@ -111,18 +133,13 @@ export async function createFaissEngine(
   config?: FaissEngineConfig,
 ): Promise<FaissEngineResult> {
   const shouldFallback = config?.fallback !== false;
+  const loadFaiss = config?.loadFaiss ?? defaultLoadFaiss;
 
   // Try to load faiss-node
-  let faiss: {
-    IndexFlatIP: new (dimensions: number) => {
-      add: (vector: number[]) => void;
-      search: (query: number[], k: number) => { distances: number[]; labels: number[] };
-      ntotal: () => number;
-    };
-  };
+  let faiss: FaissModule;
 
   try {
-    faiss = await import('faiss-node');
+    faiss = await loadFaiss();
   } catch {
     if (shouldFallback) {
       console.warn(
