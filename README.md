@@ -33,10 +33,11 @@ kbx search "how does audit validation work?"
 The `lexical` provider (`src/providers/lexical.ts`) is a deterministic, zero-credential BM25 term index — it backs the `kbx` onboarding "local" search mode, which has no API key available. Build and query it directly from the library API:
 
 ```ts
-import { extractSearchUnits, buildLexicalIndex, createLexicalSearchEngine, writeLexicalArtifacts } from '@anokye-labs/kbexplorer-search';
+import { extractSearchUnits, computeContentHash, buildLexicalIndex, createLexicalSearchEngine, writeLexicalArtifacts } from '@anokye-labs/kbexplorer-search';
 
 const units = extractSearchUnits(graph);
 const index = buildLexicalIndex(units);        // deterministic BM25 term index
+const contentHash = computeContentHash(graph); // SHA-256 of the canonical graph, same input the drift gate checks
 writeLexicalArtifacts('.search', units, index, contentHash); // same checked-in shape as embedding builds
 
 const engine = createLexicalSearchEngine(units, index);
