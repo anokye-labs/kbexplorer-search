@@ -98,6 +98,8 @@ When `graphRanking: true`, results are re-ranked with graph structure and `sugge
 npm install @anokye-labs/kbexplorer-search
 ```
 
+Not yet published to npm? Install straight from GitHub until the first release lands: `npm install github:anokye-labs/kbexplorer-search`.
+
 You normally don't install this directly — the `kbx` CLI depends on it for index production and queries, and the template talks to the `serve` service over HTTP. Install it directly only when embedding the library API (`createSearchEngine`, `createSearchServer`, `extractSearchUnits`, …) in your own tooling.
 
 ## How it fits the kbx system
