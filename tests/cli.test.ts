@@ -3,7 +3,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseServeArgs, startServe } from '../src/cli.js';
-import { writeArtifacts } from '../src/artifacts.js';
+import { writeArtifacts, writeLexicalArtifacts } from '../src/artifacts.js';
+import { buildLexicalIndex } from '../src/providers/lexical.js';
 import type { EmbeddingProvider } from '../src/providers/interface.js';
 import type { SearchUnit, EmbeddingVector, SearchConfig } from '../src/types.js';
 
@@ -128,6 +129,37 @@ describe('startServe', () => {
       }).then((r) => r.json());
       expect(search.results[0].nodeId).toBe('node-a');
       expect(search.suggestions.map((s: { nodeId: string }) => s.nodeId)).toContain('node-b');
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it('serves a lexical-provider (BM25) search end-to-end without 500ing', async () => {
+    // The headline zero-credential path: `serve --provider lexical`. The
+    // cosine engine calls provider.embed(), which LexicalProvider throws on by
+    // design — so serve must select the BM25 engine for a lexical provider.
+    // Uses the real provider registry (no creds, no network, no mock).
+    const dir = tmpArtifactDir();
+    const index = buildLexicalIndex(units);
+    writeLexicalArtifacts(dir, units, index, 'testhash');
+
+    const { server, port } = await startServe({
+      dir,
+      port: 0,
+      host: '127.0.0.1',
+      provider: 'lexical',
+      help: false,
+    });
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: 'audit validation', limit: 5 }),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.results.length).toBeGreaterThan(0);
+      expect(body.results[0].nodeId).toBe('node-a');
     } finally {
       await server.stop();
     }
