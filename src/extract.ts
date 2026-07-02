@@ -234,8 +234,29 @@ export function extractSearchUnits(
   };
   const access = resolveAccessConfig(accessConfig);
 
-  const nodeMap = new Map(graph.nodes.map((n) => [n.id, n]));
-  const connectionMap = buildConnectionMap(graph.edges);
+  // Nodes dropped entirely from the index (default `exclude` mode only — in
+  // `include` mode every node still gets a unit, so nothing needs filtering
+  // out of the adjacency views built below).
+  //
+  // AF-001 / #15 / #16: an excluded node must be unreachable from ANY public
+  // unit — not just absent as its own unit. That means `buildConnectionMap`,
+  // `getNeighborTitles`, and `buildHierarchyPath` (and the raw `parentId`
+  // pass-through) must be derived from a FILTERED node map + FILTERED edge
+  // list that never mentions an excluded node, computed up front, before any
+  // adjacency/context data is built.
+  const excludedNodeIds = new Set(
+    graph.nodes
+      .filter((n) => isExcludedByAccess(n.access, access) && access.mode === 'exclude')
+      .map((n) => n.id),
+  );
+
+  const nodeMap = new Map(
+    graph.nodes.filter((n) => !excludedNodeIds.has(n.id)).map((n) => [n.id, n]),
+  );
+  const edges = graph.edges.filter(
+    (e) => !excludedNodeIds.has(e.from) && !excludedNodeIds.has(e.to),
+  );
+  const connectionMap = buildConnectionMap(edges);
   const units: SearchUnit[] = [];
 
   // Process nodes in sorted order for determinism
@@ -247,7 +268,13 @@ export function extractSearchUnits(
     // `include` mode it is indexed with its label attached for host filtering.
     const excluded = isExcludedByAccess(node.access, access);
     if (excluded && access.mode === 'exclude') continue;
-    const unitAccess = excluded ? node.access : undefined;
+    // Carry the access label for ALL labeled nodes (AF-017/AF-018-M1), not
+    // just ones that happen to match the exclusion criteria — a host running
+    // in `include` mode needs every label (including e.g. `public`) to
+    // enforce a query-time filter. A node with no label at all still yields
+    // `undefined` here, which is the documented fails-open default: a
+    // missing label is treated as public (AF-018-M2).
+    const unitAccess = node.access;
 
     // Use rawContent (markdown) as primary; fall back to stripped HTML
     const bodyText = node.rawContent?.trim()
@@ -259,7 +286,11 @@ export function extractSearchUnits(
 
     const connections = connectionMap.get(node.id) ?? [];
     const hierarchyPath = buildHierarchyPath(node.id, nodeMap);
-    const neighborTitles = getNeighborTitles(node.id, graph.edges, nodeMap);
+    const neighborTitles = getNeighborTitles(node.id, edges, nodeMap);
+    // An excluded node never gets a unit of its own, so exposing it as a raw
+    // `parentId` would still leak its id via a public child's unit (#16).
+    const parentId =
+      node.parent && !excludedNodeIds.has(node.parent) ? node.parent : undefined;
     const clusterName = resolveClusterName(node.cluster, graph.clusters);
     const contextHeader = buildContextHeader(
       node.title,
@@ -282,7 +313,7 @@ export function extractSearchUnits(
         title: node.title,
         cluster: node.cluster,
         path: sourcePath,
-        parentId: node.parent,
+        parentId,
         entityType: node.entityType,
         identity: node.identity,
         connections,
@@ -306,7 +337,7 @@ export function extractSearchUnits(
           title: node.title,
           cluster: node.cluster,
           path: sourcePath,
-          parentId: node.parent,
+          parentId,
           entityType: node.entityType,
           identity: node.identity,
           connections,

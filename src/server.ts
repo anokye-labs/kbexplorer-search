@@ -19,13 +19,44 @@
 
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { EmbeddingProvider } from './providers/interface.js';
-import type { EmbeddingArtifact, SearchOptions, SearchResult } from './types.js';
+import type {
+  EmbeddingArtifact,
+  LexicalIndex,
+  SearchEngine,
+  SearchOptions,
+  SearchResult,
+  SearchUnit,
+} from './types.js';
 import { createSearchEngine } from './search-engine.js';
+import { createLexicalSearchEngine, LEXICAL_PROVIDER_NAME } from './providers/lexical.js';
 import { applyGraphRanking, type RelatedSuggestion } from './graph-ranking.js';
 
 export interface ServerConfig {
   port?: number;
   host?: string;
+  /**
+   * Host-side, query-time access filter (AF-017/AF-018-M1), forwarded as
+   * `SearchOptions.filterUnit` on every `/search` request served by this
+   * process. This is a **process-wide, static** predicate configured at
+   * `createSearchServer()` call time — a request body cannot carry a
+   * function over JSON, so per-request/per-principal enforcement (e.g.
+   * evaluating an auth header) is not available through this bundled HTTP
+   * server. A host that needs that should call the library API directly
+   * (`createSearchEngine`/`createLexicalSearchEngine`/`createFaissEngine`)
+   * and pass a fresh `filterUnit` per call.
+   *
+   * A unit with `access` left `undefined` (no label) is fails-open —
+   * treated as public — same as everywhere else in this module.
+   */
+  filterUnit?: (unit: SearchUnit) => boolean;
+  /**
+   * The BM25 term index (`lexical-index.json`), REQUIRED when serving a
+   * lexical provider. A lexical provider cannot embed — its `embed()` throws
+   * by design — so the server must serve BM25 queries from this index instead
+   * of the cosine engine (which would 500 on every request). Ignored for
+   * embedding providers.
+   */
+  lexicalIndex?: LexicalIndex;
 }
 
 export interface SearchServer {
@@ -72,7 +103,35 @@ function jsonResponse(res: ServerResponse, status: number, body: unknown): void 
 }
 
 /**
- * Create a search HTTP server from artifacts and an embedding provider.
+ * Select the query engine that matches the provider. A lexical provider (or a
+ * lexical-tagged artifact) is served with the BM25 engine built from the term
+ * index; every embedding provider uses the cosine engine. Selecting the cosine
+ * engine for a lexical provider would call `provider.embed()`, which a
+ * `LexicalProvider` throws on by design — 500ing every request.
+ */
+function selectEngine(
+  artifact: EmbeddingArtifact,
+  provider: EmbeddingProvider,
+  lexicalIndex?: LexicalIndex,
+): SearchEngine {
+  const isLexical =
+    provider.name === LEXICAL_PROVIDER_NAME || artifact.meta.providerType === 'lexical';
+  if (!isLexical) {
+    return createSearchEngine(artifact, provider);
+  }
+  if (!lexicalIndex) {
+    throw new Error(
+      'Lexical provider selected but no lexical index was supplied. Pass ' +
+        'ServerConfig.lexicalIndex (e.g. via readLexicalIndex / readLexicalArtifacts) ' +
+        'so BM25 queries can be served without an embedding call.',
+    );
+  }
+  return createLexicalSearchEngine(artifact.units, lexicalIndex);
+}
+
+/**
+ * Create a search HTTP server from artifacts and a provider. The query engine
+ * is chosen to match the provider (embedding → cosine, lexical → BM25).
  */
 export function createSearchServer(
   artifact: EmbeddingArtifact,
@@ -81,7 +140,7 @@ export function createSearchServer(
 ): SearchServer {
   const port = config?.port ?? 7700;
   const host = config?.host ?? '127.0.0.1';
-  const engine = createSearchEngine(artifact, provider);
+  const engine = selectEngine(artifact, provider, config?.lexicalIndex);
 
   const httpServer = createServer(async (req, res) => {
     // CORS preflight
@@ -133,6 +192,7 @@ export function createSearchServer(
           cluster: body.cluster,
           entityType: body.entityType,
           minScore: body.minScore,
+          filterUnit: config?.filterUnit,
         };
 
         const rawResults: SearchResult[] = await engine.search(body.query, options);
@@ -144,7 +204,16 @@ export function createSearchServer(
         let results: SearchResult[] = rawResults;
         let suggestions: RelatedSuggestion[] = [];
         if (body.graphRanking) {
-          const ranked = applyGraphRanking(rawResults, artifact.units);
+          // Forward the SAME access filter used for results so graph
+          // suggestions can never surface an access-filtered node (AF-001,
+          // #102): ranking/suggestions must operate on the identical
+          // access-filtered unit set the results were drawn from.
+          const ranked = applyGraphRanking(
+            rawResults,
+            artifact.units,
+            undefined,
+            config?.filterUnit,
+          );
           results = ranked.results;
           suggestions = ranked.suggestions;
         }

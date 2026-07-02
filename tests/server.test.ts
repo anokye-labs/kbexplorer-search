@@ -165,3 +165,101 @@ describe('search server', () => {
     expect(res.status).toBe(204);
   });
 });
+
+describe('search server — filterUnit (AF-017/AF-018-M1 include-mode filter hook)', () => {
+  let port: number;
+  // Process-wide static filter: a host applying its own access-check logic
+  // to every request served by this server instance.
+  const srv = createSearchServer(artifact, mockProvider(), {
+    port: 0,
+    filterUnit: (unit) => unit.nodeId !== 'node-b',
+  });
+
+  beforeAll(async () => {
+    port = await srv.start();
+  });
+
+  afterAll(async () => {
+    await srv.stop();
+  });
+
+  it('forwards ServerConfig.filterUnit to every /search request', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: 'audit validation graph rendering', limit: 5 }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.results.map((r: { nodeId: string }) => r.nodeId)).not.toContain('node-b');
+  });
+});
+
+describe('search server — graph suggestions honour the access filter (AF-001, #102)', () => {
+  // `secret` (restricted) is adjacent to the public `pub`. In include-mode the
+  // restricted unit is indexed (carrying its label) and only the host filter
+  // keeps it out of results. With graphRanking on, suggestions must NOT leak
+  // the restricted node's id/title even though it is a graph neighbor.
+  const leakUnits: SearchUnit[] = [
+    {
+      unitId: 'pub',
+      nodeId: 'pub',
+      chunkIndex: 0,
+      text: 'Title: Public\n\nContent about audit validation',
+      title: 'Public Doc',
+      cluster: 'core',
+      connections: ['secret'],
+      metadata: {},
+    },
+    {
+      unitId: 'secret',
+      nodeId: 'secret',
+      chunkIndex: 0,
+      text: 'Title: Secret\n\nRestricted salary figures',
+      title: 'SECRET Salaries',
+      cluster: 'hr',
+      connections: ['pub'],
+      access: { classification: 'restricted' },
+      metadata: {},
+    },
+  ];
+  const leakVectors: EmbeddingVector[] = [
+    { unitId: 'pub', vector: normalize([1, 0, 0]), model: 'mock-model', dimensions: 3 },
+    { unitId: 'secret', vector: normalize([0.9, 0.1, 0]), model: 'mock-model', dimensions: 3 },
+  ];
+  const leakArtifact: EmbeddingArtifact = {
+    meta: { version: 1, contentHash: 'h', model: 'mock-model', dimensions: 3, unitCount: 2 },
+    units: leakUnits,
+    vectors: leakVectors,
+  };
+
+  let port: number;
+  const srv = createSearchServer(leakArtifact, mockProvider(), {
+    port: 0,
+    // Host access enforcement: withhold restricted units at query time.
+    filterUnit: (unit) => unit.access?.classification !== 'restricted',
+  });
+
+  beforeAll(async () => {
+    port = await srv.start();
+  });
+  afterAll(async () => {
+    await srv.stop();
+  });
+
+  it('excludes the restricted node from BOTH results and suggestions', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: 'audit validation', limit: 5, graphRanking: true }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    expect(body.results.map((r: { nodeId: string }) => r.nodeId)).not.toContain('secret');
+
+    const suggestionsBlob = JSON.stringify(body.suggestions);
+    expect(suggestionsBlob).not.toContain('secret');
+    expect(suggestionsBlob).not.toContain('SECRET Salaries');
+  });
+});

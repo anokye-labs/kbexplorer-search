@@ -9,6 +9,8 @@ export type {
   SearchOptions,
   SearchEngine,
   ResolvedChunkingConfig,
+  LexicalPosting,
+  LexicalIndex,
 } from './types.js';
 export { DEFAULT_CHUNKING, DEFAULT_BATCH_SIZE, ARTIFACT_VERSION } from './types.js';
 
@@ -31,7 +33,10 @@ export { extractSearchUnits } from './extract.js';
 export {
   DEFAULT_ACCESS_EXCLUSION,
   CLASSIFICATION_SEVERITY,
+  VISIBILITY_SEVERITY,
   ABSENT_CLASSIFICATION_SEVERITY,
+  TOP_CLASSIFICATION_SEVERITY,
+  TOP_VISIBILITY_SEVERITY,
   resolveAccessConfig,
   classificationSeverity,
   isExcludedByAccess,
@@ -47,6 +52,10 @@ export type { EmbedProgressCallback, GenerateEmbeddingsOptions } from './embed.j
 export {
   writeArtifacts,
   readArtifacts,
+  writeLexicalIndex,
+  readLexicalIndex,
+  writeLexicalArtifacts,
+  readLexicalArtifacts,
   computeContentHash,
   canonicalStringify,
 } from './artifacts.js';
@@ -63,6 +72,15 @@ export {
   listProviders,
 } from './providers/index.js';
 export { OpenAIProvider } from './providers/index.js';
+export {
+  LexicalProvider,
+  LEXICAL_PROVIDER_NAME,
+  tokenize,
+  buildLexicalIndex,
+  scoreLexicalQuery,
+  createLexicalSearchEngine,
+} from './providers/index.js';
+export type { LexicalIndexOptions } from './providers/index.js';
 
 export { createSearchServer } from './server.js';
 export type { ServerConfig, SearchServer } from './server.js';

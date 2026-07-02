@@ -14,7 +14,7 @@
  */
 
 import { resolve } from 'node:path';
-import { readArtifacts } from './artifacts.js';
+import { readArtifacts, readLexicalIndex } from './artifacts.js';
 import { createSearchServer, type SearchServer } from './server.js';
 import { getProvider } from './providers/index.js';
 import type { EmbeddingProvider } from './providers/interface.js';
@@ -106,9 +106,15 @@ export async function startServe(
   const resolveProvider = deps.resolveProvider ?? getProvider;
   const provider = resolveProvider(opts.provider, { model, dimensions });
 
+  // Load the BM25 term index if present so a lexical provider can be served
+  // with the BM25 engine (an embedding provider ignores it). Without this the
+  // server would fall back to the cosine engine and 500 on every lexical query.
+  const lexicalIndex = readLexicalIndex(dir) ?? undefined;
+
   const server = createSearchServer(artifact, provider, {
     port: opts.port,
     host: opts.host,
+    lexicalIndex,
   });
   const port = await server.start();
   return { server, port, artifact };
@@ -146,8 +152,10 @@ function printServeHelp(): void {
     --dimensions <n>      Query dimensions (default: the indexed dimensions)
     -h, --help            Show this help
 
-  The query provider must match the model used to build the index. The OpenAI
-  provider requires OPENAI_API_KEY in the environment.
+  The query provider must match the one used to build the index. The OpenAI
+  provider requires OPENAI_API_KEY in the environment. Use --provider lexical
+  for the zero-credential BM25 index (no API key, no network) — the server
+  serves it from lexical-index.json with BM25 scoring.
 `);
 }
 

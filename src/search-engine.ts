@@ -13,6 +13,7 @@ import type {
   SearchOptions,
   SearchEngine,
 } from './types.js';
+import { makeSnippet } from './snippet.js';
 
 /** Cosine similarity between two vectors. */
 function cosineSimilarity(a: number[], b: number[]): number {
@@ -26,16 +27,6 @@ function cosineSimilarity(a: number[], b: number[]): number {
   }
   const denom = Math.sqrt(normA) * Math.sqrt(normB);
   return denom === 0 ? 0 : dot / denom;
-}
-
-/** Truncate text to a snippet of approximately `maxWords` words. */
-function makeSnippet(text: string, maxWords = 40): string {
-  // Strip the context header (first line before double newline)
-  const bodyStart = text.indexOf('\n\n');
-  const body = bodyStart >= 0 ? text.slice(bodyStart + 2) : text;
-  const words = body.split(/\s+/).filter(Boolean);
-  if (words.length <= maxWords) return body.trim();
-  return words.slice(0, maxWords).join(' ') + '...';
 }
 
 /**
@@ -60,6 +51,7 @@ export function createSearchEngine(
       const minScore = options?.minScore ?? 0;
       const clusterFilter = options?.cluster;
       const entityTypeFilter = options?.entityType;
+      const filterUnit = options?.filterUnit;
 
       // Embed the query
       const [queryVector] = await provider.embed([query]);
@@ -73,6 +65,7 @@ export function createSearchEngine(
         // Apply filters
         if (clusterFilter && unit.cluster !== clusterFilter) continue;
         if (entityTypeFilter && unit.entityType !== entityTypeFilter) continue;
+        if (filterUnit && !filterUnit(unit)) continue;
 
         const score = cosineSimilarity(queryVector, vec.vector);
         if (score >= minScore) {

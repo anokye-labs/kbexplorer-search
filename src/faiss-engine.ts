@@ -20,6 +20,16 @@ import type {
   SearchUnit,
 } from './types.js';
 import { createSearchEngine } from './search-engine.js';
+import { makeSnippet } from './snippet.js';
+
+/** The subset of the `faiss-node` module surface this engine depends on. */
+export interface FaissModule {
+  IndexFlatIP: new (dimensions: number) => {
+    add: (vector: number[]) => void;
+    search: (query: number[], k: number) => { distances: number[]; labels: number[] };
+    ntotal: () => number;
+  };
+}
 
 /** Configuration for the FAISS engine. */
 export interface FaissEngineConfig {
@@ -28,6 +38,19 @@ export interface FaissEngineConfig {
    * is unavailable (default: true).
    */
   fallback?: boolean;
+  /**
+   * Internal test seam — overrides how the `faiss-node` module is loaded.
+   * Defaults to the real dynamic `import('faiss-node')`. Not part of the
+   * supported public API surface; it exists so tests can deterministically
+   * simulate faiss-node being present or absent regardless of whether it
+   * actually built on the machine running the tests.
+   */
+  loadFaiss?: () => Promise<FaissModule>;
+}
+
+/** Default loader: the real dynamic import of the optional native module. */
+async function defaultLoadFaiss(): Promise<FaissModule> {
+  return import('faiss-node');
 }
 
 /** Result of attempting to create a FAISS engine. */
@@ -36,15 +59,6 @@ export interface FaissEngineResult {
   engine: SearchEngine;
   /** Whether FAISS is actually being used. */
   accelerated: boolean;
-}
-
-/** Truncate text to a snippet of approximately `maxWords` words. */
-function makeSnippet(text: string, maxWords = 40): string {
-  const bodyStart = text.indexOf('\n\n');
-  const body = bodyStart >= 0 ? text.slice(bodyStart + 2) : text;
-  const words = body.split(/\s+/).filter(Boolean);
-  if (words.length <= maxWords) return body.trim();
-  return words.slice(0, maxWords).join(' ') + '...';
 }
 
 /** L2-normalize a vector in place and return it. */
@@ -70,6 +84,7 @@ function buildResults(
   const minScore = options?.minScore ?? 0;
   const clusterFilter = options?.cluster;
   const entityTypeFilter = options?.entityType;
+  const filterUnit = options?.filterUnit;
   const results: SearchResult[] = [];
 
   for (let i = 0; i < indices.length; i++) {
@@ -83,6 +98,7 @@ function buildResults(
     if (!unit) continue;
     if (clusterFilter && unit.cluster !== clusterFilter) continue;
     if (entityTypeFilter && unit.entityType !== entityTypeFilter) continue;
+    if (filterUnit && !filterUnit(unit)) continue;
 
     results.push({
       nodeId: unit.nodeId,
@@ -117,20 +133,21 @@ export async function createFaissEngine(
   config?: FaissEngineConfig,
 ): Promise<FaissEngineResult> {
   const shouldFallback = config?.fallback !== false;
+  const loadFaiss = config?.loadFaiss ?? defaultLoadFaiss;
 
   // Try to load faiss-node
-  let faiss: {
-    IndexFlatIP: new (dimensions: number) => {
-      add: (vector: number[]) => void;
-      search: (query: number[], k: number) => { distances: number[]; labels: number[] };
-      ntotal: () => number;
-    };
-  };
+  let faiss: FaissModule;
 
   try {
-    faiss = await import('faiss-node');
+    faiss = await loadFaiss();
   } catch {
     if (shouldFallback) {
+      console.warn(
+        'kbexplorer-search: FAISS-accelerated search unavailable (faiss-node is ' +
+          'not installed or has no prebuilt binary for this platform) — using the ' +
+          'pure-JS cosine engine instead. See the README for optional install ' +
+          'instructions if you want accelerated k-NN on large indexes.',
+      );
       return {
         engine: createSearchEngine(artifact, provider),
         accelerated: false,
