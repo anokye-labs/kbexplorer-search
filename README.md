@@ -121,15 +121,58 @@ host **enforces** — search performs **no** principal evaluation.
 - **Default-SAFE (`exclude`):** nodes whose `classification` is `confidential`,
   `restricted`, or `unknown`, or whose `visibility` is `private`, produce **no**
   `SearchUnit` and **no** vector. They never reach `units.json`/`vectors.json`,
-  so even titles cannot leak via search. `public`/`internal` stay indexed.
+  so even titles cannot leak via search — including indirectly, through a
+  *neighboring public unit's* embedded text, `connections[]`, `parentId`, or
+  `metadata.{neighborTitles,hierarchyPath}`. `extractSearchUnits` derives all
+  of that adjacency/context data from a node map and edge list that are
+  filtered *before* any connections, neighbor titles, or hierarchy paths are
+  built, so an excluded node's title/id is unreachable from any surviving
+  unit. See `tests/extract.test.ts`'s "access-exclusion leak regression"
+  suite (AF-001 / #15 / #16) for the exact assertions — a restricted node
+  with both a parent edge and neighbor edges into public nodes, across
+  `restricted`/`confidential`/`unknown` classifications. `public`/`internal`
+  stay indexed.
 - **Opt-in host-predicate filtered (`include`):** restricted units are indexed
   with their `access` label attached so a host can filter at query time; search
-  still evaluates no principals.
+  still evaluates no principals. `unit.access` is carried for **every**
+  labeled node in this mode (not just ones that happen to match the exclusion
+  criteria — e.g. an explicit `public` label is preserved too), so a host has
+  the full label set to filter on.
 
 Exclusion is a pure function of `(label, config)` — no timestamps, no
 randomness — so artifacts stay byte-identical and the `--check` drift gate stays
 green. Override the policy via `AccessExclusionConfig` (`mode`,
 `excludedClassifications`, `excludedVisibilities`).
+
+### Enforcing labels at query time (include-mode)
+
+`include` mode only gets you as far as attaching labels to indexed units —
+something still has to check them on every query. `SearchOptions.filterUnit`
+is that hook: an optional `(unit: SearchUnit) => boolean` predicate, applied
+identically by all three engines (`createSearchEngine`,
+`createLexicalSearchEngine`, and the FAISS path in `createFaissEngine`). A
+unit is only scored/returned when the predicate returns `true`:
+
+```ts
+const results = await engine.search(query, {
+  filterUnit: (unit) => hasAccess(currentPrincipal, unit.access),
+});
+```
+
+`createSearchServer` exposes the same hook as `ServerConfig.filterUnit`,
+forwarded to every `/search` request — but note it is a **process-wide,
+static** predicate set when the server is created, not a per-request one (a
+JSON request body can't carry a function). A host that needs per-request or
+per-principal enforcement should call the library API
+(`createSearchEngine`/`createLexicalSearchEngine`/`createFaissEngine`)
+directly and pass a fresh `filterUnit` per call instead of using the bundled
+HTTP server.
+
+**Fails open by design:** a unit whose `access` is `undefined` (no label at
+all) is treated as public unless your `filterUnit` predicate says otherwise —
+this module never invents a stricter default for unlabeled content. This
+mirrors the index-build behavior in `isExcludedByAccess` (a missing label is
+never excluded) and is a deliberate, documented choice, not an oversight.
 
 ## License
 
