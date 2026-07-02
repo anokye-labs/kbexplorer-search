@@ -45,6 +45,26 @@ const results = await engine.search('how does audit validation work?'); // same 
 
 `lexical-index.json` is additive to the standard artifact set, so `readArtifacts`/`checkDrift` (the `--check` drift gate) work unchanged against a lexical index directory. `LexicalProvider` is also registered in the provider registry (`getProvider('lexical', ...)` / `listProviders()`) for discovery; its `embed()` intentionally throws, since BM25 needs corpus-wide statistics that a stateless per-call embedding cannot carry — the real query path is `createLexicalSearchEngine`.
 
+## Accelerated search (optional)
+
+`createFaissEngine` builds a [FAISS](https://github.com/facebookresearch/faiss) `IndexFlatIP` from the checked-in vectors for faster k-NN on large indexes. FAISS is **runtime acceleration only** — the portable JSON artifacts remain the durable source of truth (see `AGENTS.md`), so nothing depends on it being present.
+
+`faiss-node` is declared as an `optionalDependency`, not a hard dependency — it ships prebuilt native binaries for a subset of platforms/Node versions, and `npm install` will skip it silently if none matches (or if no native build toolchain is available), same as any other optional dependency. To opt in:
+
+```bash
+npm install faiss-node
+```
+
+When `faiss-node` isn't installed (or fails to load for any reason), `createFaissEngine` logs a clear message and transparently falls back to the pure-JS cosine engine (`search-engine.ts`) — same `SearchEngine` interface, same `SearchResult` shape, just without the native acceleration:
+
+```
+kbexplorer-search: FAISS-accelerated search unavailable (faiss-node is not installed or has
+no prebuilt binary for this platform) — using the pure-JS cosine engine instead. See the
+README for optional install instructions if you want accelerated k-NN on large indexes.
+```
+
+Pass `{ fallback: false }` to `createFaissEngine` to throw instead of falling back (e.g. if a deployment wants to fail fast when acceleration is expected but missing).
+
 ## Running the search service
 
 The browser SPA ([kbexplorer-template](https://github.com/anokye-labs/kbexplorer-template)) consumes search over HTTP. Start the localhost service straight from this package — no extra wiring needed:

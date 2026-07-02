@@ -123,6 +123,12 @@ export async function createFaissEngine(
     faiss = await import('faiss-node');
   } catch {
     if (shouldFallback) {
+      console.warn(
+        'kbexplorer-search: FAISS-accelerated search unavailable (faiss-node is ' +
+          'not installed or has no prebuilt binary for this platform) — using the ' +
+          'pure-JS cosine engine instead. See the README for optional install ' +
+          'instructions if you want accelerated k-NN on large indexes.',
+      );
       return {
         engine: createSearchEngine(artifact, provider),
         accelerated: false,
