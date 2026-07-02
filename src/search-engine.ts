@@ -51,6 +51,7 @@ export function createSearchEngine(
       const minScore = options?.minScore ?? 0;
       const clusterFilter = options?.cluster;
       const entityTypeFilter = options?.entityType;
+      const filterUnit = options?.filterUnit;
 
       // Embed the query
       const [queryVector] = await provider.embed([query]);
@@ -64,6 +65,7 @@ export function createSearchEngine(
         // Apply filters
         if (clusterFilter && unit.cluster !== clusterFilter) continue;
         if (entityTypeFilter && unit.entityType !== entityTypeFilter) continue;
+        if (filterUnit && !filterUnit(unit)) continue;
 
         const score = cosineSimilarity(queryVector, vec.vector);
         if (score >= minScore) {

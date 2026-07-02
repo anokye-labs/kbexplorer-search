@@ -92,6 +92,15 @@ describe('createFaissEngine', () => {
     expect(results.length).toBe(1);
   });
 
+  it('fallback engine respects filterUnit predicate (AF-017/AF-018-M1)', async () => {
+    const { engine } = await createFaissEngine(artifact, mockProvider());
+
+    const results = await engine.search('test', {
+      filterUnit: (unit) => unit.nodeId !== 'node-a',
+    });
+    expect(results.map((r) => r.nodeId)).not.toContain('node-a');
+  });
+
   it('throws when faiss-node is missing and fallback is disabled', async () => {
     await expect(
       createFaissEngine(artifact, mockProvider(), { fallback: false }),

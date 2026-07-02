@@ -175,6 +175,7 @@ export function createLexicalSearchEngine(
       const minScore = options?.minScore ?? 0;
       const clusterFilter = options?.cluster;
       const entityTypeFilter = options?.entityType;
+      const filterUnit = options?.filterUnit;
 
       const scores = scoreLexicalQuery(index, query);
 
@@ -184,6 +185,7 @@ export function createLexicalSearchEngine(
         if (!unit) continue;
         if (clusterFilter && unit.cluster !== clusterFilter) continue;
         if (entityTypeFilter && unit.entityType !== entityTypeFilter) continue;
+        if (filterUnit && !filterUnit(unit)) continue;
         if (score >= minScore) scored.push({ unitId, score });
       }
 

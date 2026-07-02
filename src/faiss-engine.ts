@@ -62,6 +62,7 @@ function buildResults(
   const minScore = options?.minScore ?? 0;
   const clusterFilter = options?.cluster;
   const entityTypeFilter = options?.entityType;
+  const filterUnit = options?.filterUnit;
   const results: SearchResult[] = [];
 
   for (let i = 0; i < indices.length; i++) {
@@ -75,6 +76,7 @@ function buildResults(
     if (!unit) continue;
     if (clusterFilter && unit.cluster !== clusterFilter) continue;
     if (entityTypeFilter && unit.entityType !== entityTypeFilter) continue;
+    if (filterUnit && !filterUnit(unit)) continue;
 
     results.push({
       nodeId: unit.nodeId,

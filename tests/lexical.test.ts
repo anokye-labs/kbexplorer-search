@@ -214,6 +214,14 @@ describe('createLexicalSearchEngine', () => {
     const results = await engine.search('zzz nonexistent');
     expect(results).toEqual([]);
   });
+
+  it('respects filterUnit predicate (AF-017/AF-018-M1 query-time filter hook)', async () => {
+    const engine = createLexicalSearchEngine(units, index);
+    const results = await engine.search('graph engine audit project', {
+      filterUnit: (unit) => unit.nodeId !== 'audit',
+    });
+    expect(results.map((r) => r.nodeId)).not.toContain('audit');
+  });
 });
 
 describe('LexicalProvider and provider registry', () => {

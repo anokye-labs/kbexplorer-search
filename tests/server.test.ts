@@ -165,3 +165,32 @@ describe('search server', () => {
     expect(res.status).toBe(204);
   });
 });
+
+describe('search server — filterUnit (AF-017/AF-018-M1 include-mode filter hook)', () => {
+  let port: number;
+  // Process-wide static filter: a host applying its own access-check logic
+  // to every request served by this server instance.
+  const srv = createSearchServer(artifact, mockProvider(), {
+    port: 0,
+    filterUnit: (unit) => unit.nodeId !== 'node-b',
+  });
+
+  beforeAll(async () => {
+    port = await srv.start();
+  });
+
+  afterAll(async () => {
+    await srv.stop();
+  });
+
+  it('forwards ServerConfig.filterUnit to every /search request', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: 'audit validation graph rendering', limit: 5 }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.results.map((r: { nodeId: string }) => r.nodeId)).not.toContain('node-b');
+  });
+});

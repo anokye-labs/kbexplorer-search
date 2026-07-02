@@ -19,13 +19,28 @@
 
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { EmbeddingProvider } from './providers/interface.js';
-import type { EmbeddingArtifact, SearchOptions, SearchResult } from './types.js';
+import type { EmbeddingArtifact, SearchOptions, SearchResult, SearchUnit } from './types.js';
 import { createSearchEngine } from './search-engine.js';
 import { applyGraphRanking, type RelatedSuggestion } from './graph-ranking.js';
 
 export interface ServerConfig {
   port?: number;
   host?: string;
+  /**
+   * Host-side, query-time access filter (AF-017/AF-018-M1), forwarded as
+   * `SearchOptions.filterUnit` on every `/search` request served by this
+   * process. This is a **process-wide, static** predicate configured at
+   * `createSearchServer()` call time — a request body cannot carry a
+   * function over JSON, so per-request/per-principal enforcement (e.g.
+   * evaluating an auth header) is not available through this bundled HTTP
+   * server. A host that needs that should call the library API directly
+   * (`createSearchEngine`/`createLexicalSearchEngine`/`createFaissEngine`)
+   * and pass a fresh `filterUnit` per call.
+   *
+   * A unit with `access` left `undefined` (no label) is fails-open —
+   * treated as public — same as everywhere else in this module.
+   */
+  filterUnit?: (unit: SearchUnit) => boolean;
 }
 
 export interface SearchServer {
@@ -133,6 +148,7 @@ export function createSearchServer(
           cluster: body.cluster,
           entityType: body.entityType,
           minScore: body.minScore,
+          filterUnit: config?.filterUnit,
         };
 
         const rawResults: SearchResult[] = await engine.search(body.query, options);

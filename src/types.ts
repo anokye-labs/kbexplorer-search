@@ -183,6 +183,24 @@ export interface SearchOptions {
   entityType?: string;
   /** Minimum cosine similarity score (default: 0). */
   minScore?: number;
+  /**
+   * Optional host-side, query-time filter predicate (AF-017/AF-018-M1).
+   *
+   * `kbx` **labels** units via {@link SearchUnit.access} (only populated in
+   * the opt-in `include` index-build mode — see `access.ts`); search itself
+   * performs **zero** principal evaluation. This is the hook a host uses to
+   * actually enforce those labels at query time: a unit is only scored and
+   * eligible for results when `filterUnit(unit)` returns `true`.
+   *
+   * A unit with `access` left `undefined` (no label at all) is the
+   * documented fails-open default — treat it as public unless your
+   * predicate says otherwise; this module never invents a stricter default.
+   *
+   * Applied identically by every engine (`createSearchEngine`,
+   * `createLexicalSearchEngine`, `createFaissEngine`), so a host can swap
+   * engines without changing how it enforces access.
+   */
+  filterUnit?: (unit: SearchUnit) => boolean;
 }
 
 /** Interface for a search engine instance. */

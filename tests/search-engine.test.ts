@@ -147,4 +147,33 @@ describe('createSearchEngine', () => {
     const results = await engine.search('query', { limit: 1 });
     expect(results).toHaveLength(1);
   });
+
+  it('respects filterUnit predicate (AF-017/AF-018-M1 query-time filter hook)', async () => {
+    const provider = mockProvider({
+      'query': normalize([0.5, 0.5, 0.5]),
+    });
+    const engine = createSearchEngine(artifact, provider);
+
+    // A host-side predicate that excludes 'graph' — simulating a caller
+    // enforcing an access label at query time.
+    const results = await engine.search('query', {
+      filterUnit: (unit) => unit.nodeId !== 'graph',
+    });
+    expect(results.map((r) => r.nodeId)).not.toContain('graph');
+    expect(results.length).toBeGreaterThan(0);
+  });
+
+  it('filterUnit combines with other filters (cluster + filterUnit both apply)', async () => {
+    const provider = mockProvider({
+      'query': normalize([0.5, 0.5, 0.5]),
+    });
+    const engine = createSearchEngine(artifact, provider);
+
+    const results = await engine.search('query', {
+      cluster: 'engine',
+      filterUnit: (unit) => unit.nodeId !== 'audit',
+    });
+    expect(results.every((r) => r.cluster === 'engine')).toBe(true);
+    expect(results.map((r) => r.nodeId)).not.toContain('audit');
+  });
 });
