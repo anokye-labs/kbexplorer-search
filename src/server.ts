@@ -160,7 +160,16 @@ export function createSearchServer(
         let results: SearchResult[] = rawResults;
         let suggestions: RelatedSuggestion[] = [];
         if (body.graphRanking) {
-          const ranked = applyGraphRanking(rawResults, artifact.units);
+          // Forward the SAME access filter used for results so graph
+          // suggestions can never surface an access-filtered node (AF-001,
+          // #102): ranking/suggestions must operate on the identical
+          // access-filtered unit set the results were drawn from.
+          const ranked = applyGraphRanking(
+            rawResults,
+            artifact.units,
+            undefined,
+            config?.filterUnit,
+          );
           results = ranked.results;
           suggestions = ranked.suggestions;
         }

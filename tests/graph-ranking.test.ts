@@ -245,6 +245,52 @@ describe('applyGraphRanking', () => {
     expect(ranked.suggestions.some((s) => s.nodeId === 'B')).toBe(true);
   });
 
+  it('never leaks an access-filtered node via suggestions (AF-001 for the suggestions path, #102)', () => {
+    // A public node adjacent to a restricted node. In `include` index mode the
+    // restricted unit is present in `allUnits` (carrying its label) and is only
+    // kept out of results by the host's `filterUnit`. Graph ranking must apply
+    // the SAME filter so the restricted node's id/title/cluster can never ride
+    // along in `suggestions`.
+    const units: SearchUnit[] = [
+      unit('pub', { title: 'Public Doc', connections: ['secret'] }),
+      unit('secret', {
+        title: 'SECRET Salaries',
+        cluster: 'hr',
+        connections: ['pub'],
+        parentId: undefined,
+      }),
+    ];
+    const results: SearchResult[] = [result('pub', 0.9)];
+    const filterUnit = (u: SearchUnit): boolean => u.nodeId !== 'secret';
+
+    const ranked = applyGraphRanking(results, units, undefined, filterUnit);
+
+    // The restricted neighbor was the only suggestion candidate — it must be gone.
+    expect(ranked.suggestions).toEqual([]);
+    const blob = JSON.stringify(ranked.suggestions);
+    expect(blob).not.toContain('secret');
+    expect(blob).not.toContain('SECRET Salaries');
+    expect(ranked.suggestions.map((s) => s.nodeId)).not.toContain('secret');
+  });
+
+  it('still surfaces non-filtered neighbors when a filter is supplied', () => {
+    const units: SearchUnit[] = [
+      unit('pub', { connections: ['secret', 'ok'] }),
+      unit('secret', { title: 'SECRET', connections: ['pub'] }),
+      unit('ok', { title: 'Related Public', connections: ['pub'] }),
+    ];
+    const results: SearchResult[] = [result('pub', 0.9)];
+    const ranked = applyGraphRanking(
+      results,
+      units,
+      undefined,
+      (u) => u.nodeId !== 'secret',
+    );
+    const ids = ranked.suggestions.map((s) => s.nodeId);
+    expect(ids).toContain('ok');
+    expect(ids).not.toContain('secret');
+  });
+
   it('accumulates multiple source nodes for shared suggestions', () => {
     // D is a neighbor of both A and B (top results)
     const units: SearchUnit[] = [

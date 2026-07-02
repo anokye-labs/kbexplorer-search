@@ -73,11 +73,22 @@ export interface GraphRankedResult {
  * 3. Boosts parent nodes
  * 4. Re-sorts by adjusted score
  * 5. Produces related suggestions from graph neighbors not in results
+ *
+ * SECURITY (AF-001, #102): ranking and suggestions MUST operate on the SAME
+ * access-filtered unit set the search results were drawn from. In the opt-in
+ * `include` index mode an access-restricted node is present in `allUnits`
+ * (carrying its label) and is kept out of results only by the host's
+ * `filterUnit` predicate. If graph ranking built its adjacency from the
+ * unfiltered set, an excluded node's id/title/cluster would leak through
+ * `suggestions` even though it never appears in `results`. Callers that enforce
+ * access at query time (e.g. `createSearchServer`) MUST pass the same
+ * `filterUnit` here so every map below is derived from the visible units only.
  */
 export function applyGraphRanking(
   results: SearchResult[],
   allUnits: SearchUnit[],
   config?: GraphRankingConfig,
+  filterUnit?: (unit: SearchUnit) => boolean,
 ): GraphRankedResult {
   const cfg = { ...DEFAULT_CONFIG, ...config };
 
@@ -85,31 +96,39 @@ export function applyGraphRanking(
     return { results: [], suggestions: [] };
   }
 
+  // Access-filter FIRST: every adjacency/suggestion view below is built from
+  // `visibleUnits` so an access-filtered node can never be surfaced. Node ids
+  // that survive the filter are tracked in `visibleNodeIds` for a defensive
+  // guard on suggestion emission (a public unit's `connections`/`parentId` may
+  // still *reference* a filtered node — we must never resolve those).
+  const visibleUnits = filterUnit ? allUnits.filter((u) => filterUnit(u)) : allUnits;
+  const visibleNodeIds = new Set(visibleUnits.map((u) => u.nodeId));
+
   // Index by nodeId for multi-chunk nodes
   const nodeToUnits = new Map<string, SearchUnit[]>();
-  for (const u of allUnits) {
+  for (const u of visibleUnits) {
     const list = nodeToUnits.get(u.nodeId) ?? [];
     list.push(u);
     nodeToUnits.set(u.nodeId, list);
   }
 
-  // Build connection map: nodeId -> Set<connectedNodeId>
+  // Build connection map: nodeId -> Set<connectedNodeId> (visible endpoints only)
   const connectionMap = new Map<string, Set<string>>();
-  for (const unit of allUnits) {
+  for (const unit of visibleUnits) {
     if (!connectionMap.has(unit.nodeId)) {
       connectionMap.set(unit.nodeId, new Set());
     }
     for (const conn of unit.connections) {
-      connectionMap.get(unit.nodeId)!.add(conn);
+      if (visibleNodeIds.has(conn)) connectionMap.get(unit.nodeId)!.add(conn);
     }
   }
 
-  // Build parent map: nodeId -> parentId
+  // Build parent map: nodeId -> parentId (visible parents only)
   const parentMap = new Map<string, string>();
   // Build children map: parentId -> Set<childId>
   const childrenMap = new Map<string, Set<string>>();
-  for (const unit of allUnits) {
-    if (unit.parentId) {
+  for (const unit of visibleUnits) {
+    if (unit.parentId && visibleNodeIds.has(unit.parentId)) {
       parentMap.set(unit.nodeId, unit.parentId);
       const children = childrenMap.get(unit.parentId) ?? new Set();
       children.add(unit.nodeId);
