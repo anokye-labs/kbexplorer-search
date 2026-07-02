@@ -65,6 +65,50 @@ export interface IndexMeta {
   dimensions: number;
   /** Number of SearchUnits indexed. */
   unitCount: number;
+  /**
+   * Which kind of provider produced this artifact set. Omitted (undefined)
+   * means the historical default: a dense-vector embedding provider scored
+   * with cosine similarity. `'lexical'` marks a zero-credential BM25 term
+   * index (see {@link LexicalIndex}), scored without any embedding calls.
+   * Additive; absent means 'embedding' and existing artifacts are unaffected.
+   */
+  providerType?: 'embedding' | 'lexical';
+}
+
+/** A single term's occurrence in one indexed SearchUnit. */
+export interface LexicalPosting {
+  /** Matches SearchUnit.unitId. */
+  unitId: string;
+  /** Number of occurrences of the term in this unit's text. */
+  termFrequency: number;
+}
+
+/**
+ * Deterministic BM25 term index — the checked-in artifact backing the
+ * zero-credential lexical search provider (`lexical-index.json`).
+ *
+ * Self-describing on purpose: BM25 scoring needs corpus-wide statistics
+ * (document frequency via postings length, average document length) that
+ * must survive the process boundary between index build and query time (a
+ * stateless per-call embedding cannot carry them). Sorted keys / stable
+ * array order — no timestamps, no randomness — so two builds of the same
+ * units produce byte-identical JSON.
+ */
+export interface LexicalIndex {
+  /** Index schema version. */
+  version: number;
+  /** BM25 term-frequency saturation parameter. */
+  k1: number;
+  /** BM25 document-length normalization parameter (0..1). */
+  b: number;
+  /** Number of indexed documents (SearchUnits). */
+  docCount: number;
+  /** Average document length across all units, in tokens. */
+  avgDocLength: number;
+  /** unitId -> document length in tokens. */
+  docLengths: Record<string, number>;
+  /** term -> postings list, sorted by unitId. */
+  postings: Record<string, LexicalPosting[]>;
 }
 
 /** The complete checked-in artifact set: metadata + units + vectors. */

@@ -17,6 +17,7 @@ import type {
   IndexMeta,
   EmbeddingArtifact,
   SearchConfig,
+  LexicalIndex,
 } from './types.js';
 import { ARTIFACT_VERSION } from './types.js';
 
@@ -75,6 +76,13 @@ export function computeContentHash(graph: KBGraph): string {
 /**
  * Write search artifacts to a directory.
  * Creates the directory if it doesn't exist.
+ *
+ * `providerType` tags `index-meta.json` with which kind of provider produced
+ * the set (omitted means the historical default, a dense-vector embedding
+ * provider). Lexical (BM25) index builds pass `vectors: []` here — there are
+ * no embedding vectors — and separately write `lexical-index.json` via
+ * {@link writeLexicalIndex} (or use {@link writeLexicalArtifacts}, which does
+ * both in one call).
  */
 export function writeArtifacts(
   dir: string,
@@ -82,6 +90,7 @@ export function writeArtifacts(
   vectors: EmbeddingVector[],
   config: SearchConfig,
   contentHash: string,
+  providerType?: 'embedding' | 'lexical',
 ): void {
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
@@ -93,6 +102,7 @@ export function writeArtifacts(
     model: config.embedding.model,
     dimensions: config.embedding.dimensions ?? vectors[0]?.dimensions ?? 0,
     unitCount: units.length,
+    providerType,
   };
 
   // Sort arrays for determinism
@@ -126,4 +136,70 @@ export function readArtifacts(dir: string): EmbeddingArtifact | null {
   const vectors: EmbeddingVector[] = JSON.parse(readFileSync(vectorsPath, 'utf8'));
 
   return { meta, units, vectors };
+}
+
+/** Default BM25 model label recorded in `index-meta.json` for lexical builds. */
+const DEFAULT_LEXICAL_MODEL = 'lexical-bm25';
+
+/**
+ * Write the lexical BM25 index artifact (`lexical-index.json`) to `dir`.
+ * Canonical JSON: sorted keys, trailing newline, byte-identical for identical
+ * input (same rules as {@link writeArtifacts}).
+ */
+export function writeLexicalIndex(dir: string, index: LexicalIndex): void {
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+  writeFileSync(join(dir, 'lexical-index.json'), canonicalStringify(index));
+}
+
+/**
+ * Read the lexical BM25 index artifact from `dir`. Returns null if absent.
+ */
+export function readLexicalIndex(dir: string): LexicalIndex | null {
+  const indexPath = join(dir, 'lexical-index.json');
+  if (!existsSync(indexPath)) return null;
+  return JSON.parse(readFileSync(indexPath, 'utf8'));
+}
+
+/**
+ * Write the full lexical artifact set in one call: `units.json` +
+ * `vectors.json` (empty — a BM25 index has no embedding vectors) +
+ * `index-meta.json` (tagged `providerType: 'lexical'`) via
+ * {@link writeArtifacts}, plus `lexical-index.json` via
+ * {@link writeLexicalIndex}. This is the SAME checked-in artifact shape as
+ * an embedding-provider build, so {@link readArtifacts} and the CI drift gate
+ * ({@link checkDrift} in `drift.ts`) work unchanged against a lexical index
+ * directory — only `lexical-index.json` is additive.
+ */
+export function writeLexicalArtifacts(
+  dir: string,
+  units: SearchUnit[],
+  index: LexicalIndex,
+  contentHash: string,
+  model: string = DEFAULT_LEXICAL_MODEL,
+): void {
+  writeArtifacts(
+    dir,
+    units,
+    [],
+    { embedding: { provider: 'lexical', model, dimensions: 0 }, artifacts: { dir } },
+    contentHash,
+    'lexical',
+  );
+  writeLexicalIndex(dir, index);
+}
+
+/**
+ * Read the full lexical artifact set written by {@link writeLexicalArtifacts}.
+ * Returns null if either the standard artifact set or `lexical-index.json`
+ * is missing.
+ */
+export function readLexicalArtifacts(
+  dir: string,
+): { meta: IndexMeta; units: SearchUnit[]; index: LexicalIndex } | null {
+  const artifact = readArtifacts(dir);
+  const index = readLexicalIndex(dir);
+  if (!artifact || !index) return null;
+  return { meta: artifact.meta, units: artifact.units, index };
 }

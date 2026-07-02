@@ -24,25 +24,29 @@ FAISS or other native indexes are runtime acceleration only. The portable JSON a
 
 ### Pluggable Embedding Providers
 
-Never hardcode a specific embedding API. All embedding calls go through the `EmbeddingProvider` interface. The OpenAI provider is the default; others can be registered via the provider registry.
+Never hardcode a specific embedding API. All embedding calls go through the `EmbeddingProvider` interface. The OpenAI provider is the default; others can be registered via the provider registry. The zero-credential `lexical` provider is registered the same way for discovery, even though its BM25 query path (`buildLexicalIndex` / `createLexicalSearchEngine`) doesn't route through `embed()` — see `providers/lexical.ts`'s module docstring for why.
 
 ## Architecture
 
 ```
 src/
-  types.ts              Core type definitions (SearchUnit, SearchResult, etc.)
-  kbexplorer-types.ts   Inlined kbexplorer types (TODO: switch to @anokye-labs/kbexplorer-core)
+  types.ts              Core type definitions (SearchUnit, SearchResult, LexicalIndex, etc.)
+  kbexplorer-types.ts   Thin re-export of @anokye-labs/kbexplorer-core's graph/access types
   extract.ts            KBGraph -> SearchUnit[] extraction pipeline
   access.ts             Access-label exclusion policy for the index-build path
   embed.ts              Batch embedding generation with caching
-  artifacts.ts          Deterministic artifact read/write
+  artifacts.ts          Deterministic artifact read/write (embedding + lexical)
   drift.ts              CI drift detection gate
   search-engine.ts      Pure-JS cosine similarity search
+  faiss-engine.ts       Optional FAISS-accelerated search, falls back to search-engine.ts
+  graph-ranking.ts      Graph-aware re-ranking and related-node suggestions
+  snippet.ts            Shared snippet truncation used by every search engine
   server.ts             Localhost HTTP search service
   cli.ts                `serve` command — start the HTTP service from artifacts
   providers/
     interface.ts        EmbeddingProvider contract
     openai.ts           OpenAI embedding provider
+    lexical.ts          Zero-credential BM25 term index + provider (no API key/network)
     registry.ts         Provider name -> factory registry
   index.ts              Public API barrel export
 ```

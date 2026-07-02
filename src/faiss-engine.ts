@@ -20,6 +20,7 @@ import type {
   SearchUnit,
 } from './types.js';
 import { createSearchEngine } from './search-engine.js';
+import { makeSnippet } from './snippet.js';
 
 /** Configuration for the FAISS engine. */
 export interface FaissEngineConfig {
@@ -36,15 +37,6 @@ export interface FaissEngineResult {
   engine: SearchEngine;
   /** Whether FAISS is actually being used. */
   accelerated: boolean;
-}
-
-/** Truncate text to a snippet of approximately `maxWords` words. */
-function makeSnippet(text: string, maxWords = 40): string {
-  const bodyStart = text.indexOf('\n\n');
-  const body = bodyStart >= 0 ? text.slice(bodyStart + 2) : text;
-  const words = body.split(/\s+/).filter(Boolean);
-  if (words.length <= maxWords) return body.trim();
-  return words.slice(0, maxWords).join(' ') + '...';
 }
 
 /** L2-normalize a vector in place and return it. */

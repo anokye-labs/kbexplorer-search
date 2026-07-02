@@ -23,6 +23,28 @@ Loads checked-in artifacts, builds an efficient vector index, embeds incoming qu
 kbx search "how does audit validation work?"
 ```
 
+## Search providers
+
+| Provider | Credentials | Index artifacts | Query scoring |
+|----------|-------------|------------------|----------------|
+| `openai` (default) | `OPENAI_API_KEY` | `units.json` + `vectors.json` + `index-meta.json` | Cosine similarity |
+| `lexical` | none — no network, no API key | `units.json` + `vectors.json` (empty) + `index-meta.json` (`providerType: "lexical"`) + `lexical-index.json` | Okapi BM25 |
+
+The `lexical` provider (`src/providers/lexical.ts`) is a deterministic, zero-credential BM25 term index — it backs the `kbx` onboarding "local" search mode, which has no API key available. Build and query it directly from the library API:
+
+```ts
+import { extractSearchUnits, buildLexicalIndex, createLexicalSearchEngine, writeLexicalArtifacts } from '@anokye-labs/kbexplorer-search';
+
+const units = extractSearchUnits(graph);
+const index = buildLexicalIndex(units);        // deterministic BM25 term index
+writeLexicalArtifacts('.search', units, index, contentHash); // same checked-in shape as embedding builds
+
+const engine = createLexicalSearchEngine(units, index);
+const results = await engine.search('how does audit validation work?'); // same SearchResult shape as the cosine engine
+```
+
+`lexical-index.json` is additive to the standard artifact set, so `readArtifacts`/`checkDrift` (the `--check` drift gate) work unchanged against a lexical index directory. `LexicalProvider` is also registered in the provider registry (`getProvider('lexical', ...)` / `listProviders()`) for discovery; its `embed()` intentionally throws, since BM25 needs corpus-wide statistics that a stateless per-call embedding cannot carry — the real query path is `createLexicalSearchEngine`.
+
 ## Running the search service
 
 The browser SPA ([kbexplorer-template](https://github.com/anokye-labs/kbexplorer-template)) consumes search over HTTP. Start the localhost service straight from this package — no extra wiring needed:
