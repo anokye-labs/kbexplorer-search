@@ -31,10 +31,14 @@ export interface SearchUnit {
   /** IDs of directly connected nodes. */
   connections: string[];
   /**
-   * Access label carried from the source node. Only populated in the opt-in
-   * host-predicate filtered (`include`) index mode so a host can filter at
-   * query time; omitted in the default `exclude` mode (restricted units are
-   * dropped entirely). Search itself never evaluates principals.
+   * Access label carried from the source node, populated for every emitted
+   * unit whose source node has a label — in both index modes (AF-018-M1).
+   * In the default `exclude` mode, access-restricted nodes are dropped
+   * entirely, but any surviving labeled unit still carries its label; in the
+   * opt-in `include` mode, restricted units are indexed with their label so a
+   * host can filter at query time. A node with no label yields `undefined`,
+   * the fails-open default treated as public/unlabeled (AF-018-M2). Search
+   * itself never evaluates principals.
    */
   access?: import('./kbexplorer-types.js').KBAccessLabel;
   /** Extensible metadata bag. */
