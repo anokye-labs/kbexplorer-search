@@ -96,3 +96,49 @@ describe('isExcludedByAccess', () => {
     expect(JSON.stringify(label)).toBe(snapshot);
   });
 });
+
+describe('isExcludedByAccess — fail-closed on bespoke/unknown labels (#102)', () => {
+  const config = DEFAULT_ACCESS_EXCLUSION;
+
+  it('excludes a bespoke classification outside the built-in lattice', () => {
+    // `KBAccessClassification` is an OPEN union — a scheme may mint its own
+    // classification tokens. An unrecognized token cannot be ranked as safe,
+    // so it must fail CLOSED (withheld), not fall through as indexed.
+    expect(isExcludedByAccess({ classification: 'top-secret' }, config)).toBe(true);
+    expect(isExcludedByAccess({ classification: 'internal-only' }, config)).toBe(true);
+  });
+
+  it('excludes a bespoke visibility outside the built-in lattice', () => {
+    expect(isExcludedByAccess({ visibility: 'need-to-know' }, config)).toBe(true);
+  });
+
+  it('still indexes only the explicitly-known open tiers (public/internal)', () => {
+    expect(isExcludedByAccess({ classification: 'public' }, config)).toBe(false);
+    expect(isExcludedByAccess({ classification: 'internal' }, config)).toBe(false);
+  });
+
+  it('treats a genuinely absent label as public (fail-open ONLY for absence)', () => {
+    expect(isExcludedByAccess(undefined, config)).toBe(false);
+    expect(isExcludedByAccess({}, config)).toBe(false);
+  });
+
+  it('fail-closes bespoke tokens even when the excluded set is emptied', () => {
+    // A known token honours the (lax) config, but an unrecognized token can
+    // never be ranked safe, so it stays withheld regardless of config.
+    const lax = {
+      mode: 'exclude' as const,
+      excludedClassifications: [],
+      excludedVisibilities: [],
+    };
+    expect(isExcludedByAccess({ classification: 'restricted' }, lax)).toBe(false);
+    expect(isExcludedByAccess({ classification: 'top-secret' }, lax)).toBe(true);
+  });
+
+  it('ranks an unrecognized classification at the top (most-restrictive) tier', () => {
+    // Mirrors the CLI access lattice (`classificationRank`): a bespoke token
+    // ranks as `unknown` (the top tier), never as absent (severity 0).
+    expect(classificationSeverity({ classification: 'top-secret' })).toBe(
+      CLASSIFICATION_SEVERITY.unknown,
+    );
+  });
+});

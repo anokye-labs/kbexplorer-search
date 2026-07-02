@@ -33,7 +33,10 @@ export { extractSearchUnits } from './extract.js';
 export {
   DEFAULT_ACCESS_EXCLUSION,
   CLASSIFICATION_SEVERITY,
+  VISIBILITY_SEVERITY,
   ABSENT_CLASSIFICATION_SEVERITY,
+  TOP_CLASSIFICATION_SEVERITY,
+  TOP_VISIBILITY_SEVERITY,
   resolveAccessConfig,
   classificationSeverity,
   isExcludedByAccess,
