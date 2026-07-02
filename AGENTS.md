@@ -64,6 +64,20 @@ npm run build         # tsc -b (produces dist/)
 
 Every pull request must trace back to a GitHub Issue. Use native issue types (Epic, Feature, Task) and sub-issue/blocked-by relationships via GraphQL.
 
+## GitHub & Work-Item Conventions
+
+Tool-agnostic: `gh` CLI, raw REST/GraphQL, or an MCP GitHub server are all fine — use whichever is available. Sub-issue and blocked-by relationships are GraphQL-only; confirm GraphQL-level access before relying on that structure, since a REST/`gh`-only path can't read or write it.
+
+Reference issues with `refs #N`, never `closes #N`. Closing is a separate, deliberate step taken after verifying the fix — don't let a commit or PR description auto-close.
+
+Before starting work on an issue, check its blocked-by relationships and confirm blockers are actually resolved — not just assumed resolved from surrounding context.
+
+Conventional Commits (`type(scope): description`), atomic — one logical change per commit.
+
+Branch protection: check, don't assume. This repo currently has **no** branch protection configured on `main` (kbexplorer#105) — don't rely on an invariant like "CI must pass before merge" holding here unless you've verified it via the API for this specific repo.
+
+For multi-step or multi-repo work, see kbexplorer-template's `.agents/skills/wbs-builder/` for workback-schedule construction.
+
 ## Verification
 
 Before declaring work done, run `npm run build && npm run lint && npm test` and confirm all pass.
