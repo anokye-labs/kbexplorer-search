@@ -48,7 +48,7 @@
     "node": ">=22"
   },
   "dependencies": {
-    "@anokye-labs/kbexplorer-core": "github:anokye-labs/kbexplorer-core#v0.3.0"
+    "@anokye-labs/kbexplorer-core": "^0.5.1"
   },
   "optionalDependencies": {
     "faiss-node": "^0.5.1"

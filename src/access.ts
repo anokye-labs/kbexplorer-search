@@ -20,11 +20,21 @@
  *    Only a genuinely ABSENT label fails open (treated as public/unlabeled).
  */
 
+import {
+  DEFAULT_ACCESS_EXCLUSION as CORE_DEFAULT_ACCESS_EXCLUSION,
+  resolveAccessExclusion,
+} from '@anokye-labs/kbexplorer-core';
 import type {
-  KBAccessLabel,
+  AccessExclusionConfig,
+  AccessExclusionMode,
+} from '@anokye-labs/kbexplorer-core';
+import type {
   KBAccessClassification,
+  KBAccessLabel,
   KBAccessVisibility,
 } from './kbexplorer-types.js';
+
+export type { AccessExclusionConfig, AccessExclusionMode } from '@anokye-labs/kbexplorer-core';
 
 /**
  * Classification severity lattice (higher = more sensitive).
@@ -74,25 +84,10 @@ export const TOP_CLASSIFICATION_SEVERITY = CLASSIFICATION_SEVERITY.unknown;
 export const TOP_VISIBILITY_SEVERITY = VISIBILITY_SEVERITY.private;
 
 /**
- * How access-restricted units are treated during index build.
- *
- *  - `exclude` (default, SAFE): excluded units produce no SearchUnit and no
- *    vector — they never reach units.json/vectors.json, so titles can't leak.
- *  - `include`: the host-predicate filtered mode. Restricted units ARE indexed
- *    but each carries its `access` label so a host can filter at query time.
- *    Search still performs no principal evaluation.
+ * The core access-exclusion contract is the single source of truth for this
+ * package's index-build policy. The local module re-exports that contract so
+ * existing import sites remain stable.
  */
-export type AccessExclusionMode = 'exclude' | 'include';
-
-/** Configuration for access-label-driven index exclusion. */
-export interface AccessExclusionConfig {
-  /** Index-build treatment of restricted units. Default: `exclude`. */
-  mode: AccessExclusionMode;
-  /** Classifications excluded from the committed index. */
-  excludedClassifications: KBAccessClassification[];
-  /** Visibilities excluded from the committed index. */
-  excludedVisibilities: KBAccessVisibility[];
-}
 
 /**
  * Default-SAFE exclusion policy: withhold confidential/restricted/unknown
@@ -103,16 +98,8 @@ export interface AccessExclusionConfig {
  * a deployment may re-include `confidential`) — but any *bespoke* token outside
  * the built-in lattice is always withheld regardless of this list, since it
  * cannot be ranked as safe ({@link isExcludedByAccess}, #102).
- *
- * TODO(#102-followup): this exclusion policy should live in core as the single
- * source of truth; kbexplorer-template hand-duplicates it (and both are wider
- * than core's documented default, which withholds only restricted/unknown).
  */
-export const DEFAULT_ACCESS_EXCLUSION: AccessExclusionConfig = {
-  mode: 'exclude',
-  excludedClassifications: ['confidential', 'restricted', 'unknown'],
-  excludedVisibilities: ['private'],
-};
+export const DEFAULT_ACCESS_EXCLUSION: AccessExclusionConfig = CORE_DEFAULT_ACCESS_EXCLUSION;
 
 /**
  * Resolve a partial config into a fully-populated one, applying SAFE defaults
@@ -121,15 +108,7 @@ export const DEFAULT_ACCESS_EXCLUSION: AccessExclusionConfig = {
 export function resolveAccessConfig(
   config?: Partial<AccessExclusionConfig>,
 ): AccessExclusionConfig {
-  return {
-    mode: config?.mode ?? DEFAULT_ACCESS_EXCLUSION.mode,
-    excludedClassifications:
-      config?.excludedClassifications ??
-      DEFAULT_ACCESS_EXCLUSION.excludedClassifications,
-    excludedVisibilities:
-      config?.excludedVisibilities ??
-      DEFAULT_ACCESS_EXCLUSION.excludedVisibilities,
-  };
+  return resolveAccessExclusion(config);
 }
 
 /**
