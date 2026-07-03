@@ -24,10 +24,7 @@ import {
   DEFAULT_ACCESS_EXCLUSION as CORE_DEFAULT_ACCESS_EXCLUSION,
   resolveAccessExclusion,
 } from '@anokye-labs/kbexplorer-core';
-import type {
-  AccessExclusionConfig,
-  AccessExclusionMode,
-} from '@anokye-labs/kbexplorer-core';
+import type { AccessExclusionConfig } from '@anokye-labs/kbexplorer-core';
 import type {
   KBAccessClassification,
   KBAccessLabel,
