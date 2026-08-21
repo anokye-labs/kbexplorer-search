@@ -1,6 +1,6 @@
 {
   "name": "@anokye-labs/kbexplorer-search",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Semantic search companion module for kbexplorer — index production and consumption over knowledge graphs",
   "type": "module",
   "exports": {
@@ -48,7 +48,7 @@
     "node": ">=22"
   },
   "dependencies": {
-    "@anokye-labs/kbexplorer-core": "^0.5.1"
+    "@anokye-labs/kbexplorer-core": "^0.6.0"
   },
   "optionalDependencies": {
     "faiss-node": "^0.5.1"
