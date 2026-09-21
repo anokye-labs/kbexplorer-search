@@ -108,6 +108,10 @@ You normally don't install this directly — the `kbx` CLI depends on it for ind
 - [**kbexplorer-cli** (`kbx`)](https://github.com/anokye-labs/kbexplorer-cli) — builds the graph from local content and drives `search-index` / `search`.
 - [**kbexplorer-template**](https://github.com/anokye-labs/kbexplorer-template) — the SPA; calls `POST /search` on the `serve` service via `VITE_SEARCH_SERVICE_URL`.
 
+## Documentation
+
+- [Architecture overview](./docs/architecture.md) — package responsibility, public API, graph-to-index flow, provider boundaries, and the explicitly supported limits in the current implementation.
+
 ## Contract
 
 - **kbexplorer** defines and renders the knowledge graph.
